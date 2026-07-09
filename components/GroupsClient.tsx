@@ -3,16 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-interface GroupItem {
-  groupId: string;
-  name: string;
-  inviteCode: string;
-  scheduledTime: string;
-  isAdmin: boolean;
-  isCurrent: boolean;
-}
-
-export default function GroupsClient({ groups }: { groups: GroupItem[] }) {
+export default function GroupsClient() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [joinTime, setJoinTime] = useState("09:00");
@@ -44,11 +35,6 @@ export default function GroupsClient({ groups }: { groups: GroupItem[] }) {
     }
   }
 
-  async function switchTo(groupId: string) {
-    const data = await post("/api/switch-group", { groupId });
-    if (data) router.push("/dashboard");
-  }
-
   async function join() {
     const data = await post("/api/join", { inviteCode, scheduledTime: joinTime });
     if (data) {
@@ -67,38 +53,6 @@ export default function GroupsClient({ groups }: { groups: GroupItem[] }) {
 
   return (
     <>
-      <div className="card">
-        <h2>내 그룹 🏟️</h2>
-        {groups.length === 0 && (
-          <p className="muted">
-            아직 참여한 그룹이 없어요. 아래에서 그룹을 만들거나 초대코드로 참여해 보세요!
-          </p>
-        )}
-        {groups.map((g) => (
-          <div className="member-row" key={g.groupId}>
-            <div className="who">
-              <div className="nm">
-                {g.name}
-                {g.isAdmin && " 👑"}
-                {g.isCurrent && (
-                  <span className="badge onTime" style={{ marginLeft: 6 }}>
-                    보는 중
-                  </span>
-                )}
-              </div>
-              <div className="sub">
-                기준 {g.scheduledTime} · 초대코드 {g.inviteCode}
-              </div>
-            </div>
-            {!g.isCurrent && (
-              <button className="btn small ghost" onClick={() => switchTo(g.groupId)} disabled={busy}>
-                이 그룹 보기
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
       <div className="card">
         <h2>초대코드로 참여 🎟️</h2>
         <label className="field">

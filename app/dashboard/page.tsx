@@ -1,131 +1,113 @@
 import { redirect } from "next/navigation";
 import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { kstParts, fmtTimeKST, isWorkday } from "@/lib/time";
-import { avatarInfo } from "@/lib/types";
+import { kstParts, isWorkday, minutesFromHHMM } from "@/lib/time";
 import { TopBar, TabBar } from "@/components/Nav";
 import CheckinCard from "@/components/CheckinCard";
-import KungyaFace from "@/components/KungyaFace";
-import InviteCode from "@/components/InviteCode";
+import GroupList, { type GroupListItem } from "@/components/GroupList";
+import type { CheckinStatus } from "@/components/StatusKungya";
 
 export const dynamic = "force-dynamic";
 
+// "오늘" 화면 — 인증 카드 + 내 그룹 목록.
+// 그룹을 누르면 /group/[id]에서 그 그룹의 오늘 현황을 본다.
 export default async function Dashboard() {
   const auth = await getAuthed();
   if (!auth) redirect("/");
-  if (!auth.current) redirect("/groups");
-  const { member, group } = auth.current;
+  if (auth.memberships.length === 0) redirect("/groups");
 
   const d = await db();
-  const kst = kstParts();
-  const today = kst.date;
-  const members = await d.listMembers(group.id);
-  const ids = members.map((m) => m.id);
-  const checkins = await d.listCheckins(ids, today, today);
-  const absences = await d.listAbsences(ids, today, today);
-  const overrides = await d.listOverrides(ids, today, today);
-  const effectiveTime = (m: (typeof members)[number]) =>
-    overrides.find((o) => o.member_id === m.id)?.scheduled_time ?? m.scheduled_time;
+  const today = kstParts().date;
+  const myIds = auth.memberships.map((m) => m.member.id);
+  const myCheckins = await d.listCheckins(myIds, today, today);
+  const myAbsences = await d.listAbsences(myIds, today, today);
+  const myOverrides = await d.listOverrides(myIds, today, today);
 
-  const myCheckin = checkins.find((c) => c.member_id === member.id);
-  const myAbsence = absences.find((a) => a.member_id === member.id);
-
-  // 멀티 그룹 인증: 내 모든 멤버십의 오늘 인증 여부
-  const myMembershipIds = auth.memberships.map((m) => m.member.id);
-  const myCheckinsToday = await d.listCheckins(myMembershipIds, today, today);
-  const groupOptions = auth.memberships.map(({ member: mm, group: gg }) => ({
-    groupId: gg.id,
-    groupName: gg.name,
-    alreadyChecked: myCheckinsToday.some((c) => c.member_id === mm.id),
-  }));
-
-  const rows = members.map((m) => {
-    const c = checkins.find((x) => x.member_id === m.id);
-    const a = absences.find((x) => x.member_id === m.id);
-    const workday = isWorkday(today, m.workdays);
-    let badge: { cls: string; label: string };
-    if (a) badge = { cls: "excused", label: `🏠 ${a.reason}` };
-    else if (c)
-      badge = c.is_late
-        ? { cls: "late", label: `😭 지각 +${c.late_minutes}분` }
+  // 그룹별 요약 (멤버 수·출근 수) + 나의 오늘 상태
+  const groups: GroupListItem[] = [];
+  for (const { member, group } of auth.memberships) {
+    const members = await d.listMembers(group.id);
+    const checkins = await d.listCheckins(
+      members.map((m) => m.id),
+      today,
+      today
+    );
+    const myCheckin = myCheckins.find((c) => c.member_id === member.id);
+    const myAbsence = myAbsences.find((a) => a.member_id === member.id);
+    const workday = isWorkday(today, member.workdays);
+    let myBadge: { cls: string; label: string };
+    if (myAbsence) myBadge = { cls: "excused", label: `🏠 ${myAbsence.reason}` };
+    else if (myCheckin)
+      myBadge = myCheckin.is_late
+        ? { cls: "late", label: `😭 +${myCheckin.late_minutes}분` }
         : { cls: "onTime", label: "🥳 출근" };
-    else if (!workday) badge = { cls: "restDay", label: "휴무" };
-    else badge = { cls: "pending", label: "😴 미출근" };
-    return { m, c, badge };
-  });
+    else if (!workday) myBadge = { cls: "restDay", label: "휴무" };
+    else myBadge = { cls: "pending", label: "😴 인증 전" };
 
-  const photos = rows
-    .filter((r) => r.c?.photo_path)
-    .map((r) => ({
-      name: r.m.name,
-      avatar: r.m.avatar,
-      time: fmtTimeKST(r.c!.checked_at),
-      url: d.photoUrl(r.c!.photo_path!),
-      late: r.c!.is_late,
-    }));
+    groups.push({
+      groupId: group.id,
+      name: group.name,
+      isAdmin: member.is_admin,
+      scheduledTime: member.scheduled_time,
+      checkedCount: checkins.length,
+      memberCount: members.length,
+      myBadge,
+    });
+  }
+
+  // 인증 카드 상태 — 오늘 근무일인 그룹들 기준
+  const effectiveTime = (memberId: string, fallback: string) =>
+    myOverrides.find((o) => o.member_id === memberId)?.scheduled_time ?? fallback;
+  const workdayMs = auth.memberships.filter(({ member }) => isWorkday(today, member.workdays));
+  const activeMs = workdayMs.filter(
+    ({ member }) => !myAbsences.some((a) => a.member_id === member.id)
+  );
+  const uncheckedMs = activeMs.filter(
+    ({ member }) => !myCheckins.some((c) => c.member_id === member.id)
+  );
+
+  let status: CheckinStatus;
+  let countdownTo: string | null = null;
+  let lateMinutes = 0;
+  if (workdayMs.length > 0 && activeMs.length === 0) {
+    status = "excused"; // 근무일인 그룹이 전부 휴가
+  } else if (activeMs.length > 0 && uncheckedMs.length === 0) {
+    // 인증할 그룹을 모두 인증함 — 하나라도 지각이면 지각으로 표시
+    const late = myCheckins.filter((c) => c.is_late);
+    status = late.length > 0 ? "late" : "onTime";
+    lateMinutes = Math.max(0, ...late.map((c) => c.late_minutes));
+  } else {
+    status = "before";
+    // 아직 인증 안 한 그룹 중 가장 이른 기준 시각까지 카운트다운
+    const targets = (uncheckedMs.length > 0 ? uncheckedMs : activeMs).map(({ member }) =>
+      effectiveTime(member.id, member.scheduled_time)
+    );
+    if (targets.length > 0) {
+      countdownTo = targets.reduce((a, b) =>
+        minutesFromHHMM(a) <= minutesFromHHMM(b) ? a : b
+      );
+    }
+  }
+
+  const groupOptions = auth.memberships.map(({ member, group }) => ({
+    groupId: group.id,
+    groupName: group.name,
+    alreadyChecked: myCheckins.some((c) => c.member_id === member.id),
+  }));
 
   return (
     <>
-      <TopBar groupName={group.name} />
+      <TopBar groupName="" />
       <main className="container">
         <CheckinCard
           avatar={auth.user.avatar}
-          scheduledTime={effectiveTime(member)}
-          alreadyChecked={!!myCheckin}
-          checkedTime={myCheckin ? fmtTimeKST(myCheckin.checked_at) : undefined}
-          wasLate={myCheckin?.is_late}
-          lateMinutes={myCheckin?.late_minutes}
-          isWorkdayToday={isWorkday(today, member.workdays)}
-          hasAbsenceToday={!!myAbsence}
-          currentGroupId={group.id}
+          status={status}
+          lateMinutes={lateMinutes}
+          countdownTo={countdownTo}
+          isWorkdayToday={workdayMs.length > 0}
           groupOptions={groupOptions}
         />
-
-        <div className="card">
-          <h2>오늘의 쿵야들 ({rows.filter((r) => r.c).length}/{rows.length} 출근)</h2>
-          {rows.map(({ m, c, badge }) => (
-            <div className="member-row" key={m.id}>
-              <div className="face">
-                <KungyaFace avatar={m.avatar} size={34} />
-              </div>
-              <div className="who">
-                <div className="nm">
-                  {m.name}
-                  {m.id === member.id && " (나)"}
-                </div>
-                <div className="sub">
-                  기준 {effectiveTime(m)}
-                  {c && ` · ${fmtTimeKST(c.checked_at)} 인증`}
-                </div>
-              </div>
-              <span className={`badge ${badge.cls}`}>{badge.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {photos.length > 0 && (
-          <div className="card">
-            <h2>오늘의 인증샷 📸</h2>
-            <div className="feed">
-              {photos.map((p, i) => (
-                <figure key={i}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url} alt={`${p.name}의 출근 인증`} />
-                  <figcaption>
-                    {avatarInfo(p.avatar).emoji} {p.name} · {p.time}
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="card" style={{ textAlign: "center" }}>
-          <p className="muted" style={{ margin: "0 0 8px" }}>
-            친구를 초대하려면 초대코드를 공유하세요 (누르면 복사돼요)
-          </p>
-          <InviteCode code={group.invite_code} />
-        </div>
+        <GroupList groups={groups} />
       </main>
       <TabBar />
     </>

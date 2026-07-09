@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import KungyaFace from "@/components/KungyaFace";
+import StatusKungya, { type CheckinStatus } from "@/components/StatusKungya";
 
 interface GroupOption {
   groupId: string;
@@ -12,19 +12,33 @@ interface GroupOption {
 
 interface Props {
   avatar: string;
-  scheduledTime: string;
-  alreadyChecked: boolean;
-  checkedTime?: string; // HH:MM:SS
-  wasLate?: boolean;
+  /** 오늘 나의 상태 — before(인증 전) / onTime(정시) / late(지각) / excused(휴가) */
+  status: CheckinStatus;
   lateMinutes?: number;
+  /** 인증 전일 때 남은 시간을 계산할 기준 시각 (HH:MM). 없으면 카운트다운 미표시 */
+  countdownTo?: string | null;
   isWorkdayToday: boolean;
-  hasAbsenceToday: boolean;
-  currentGroupId: string;
   groupOptions: GroupOption[]; // 참여 중인 모든 그룹 (멀티 인증용)
 }
 
 function nowKst(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+}
+
+/** 기준 시각(HH:MM)까지 남은 시간 문자열. 지났으면 마이너스 상태로 반환 */
+function remainingTo(target: string): { text: string; passed: boolean } {
+  const now = nowKst();
+  const [h, m] = target.split(":").map((x) => parseInt(x, 10));
+  const due = new Date(now);
+  due.setHours(h, m, 0, 0);
+  let diff = Math.floor((due.getTime() - now.getTime()) / 1000);
+  const passed = diff < 0;
+  diff = Math.abs(diff);
+  const hh = Math.floor(diff / 3600);
+  const mm = Math.floor((diff % 3600) / 60);
+  const ss = diff % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return { text: `${pad(hh)}:${pad(mm)}:${pad(ss)}`, passed };
 }
 
 export default function CheckinCard(props: Props) {
@@ -42,28 +56,22 @@ export default function CheckinCard(props: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [clock, setClock] = useState("");
+  const [countdown, setCountdown] = useState<{ text: string; passed: boolean } | null>(null);
   const [dateLabel, setDateLabel] = useState("");
 
   useEffect(() => {
     const tick = () => {
-      const d = nowKst();
-      setClock(
-        [d.getHours(), d.getMinutes(), d.getSeconds()]
-          .map((n) => String(n).padStart(2, "0"))
-          .join(":")
-      );
       setDateLabel(
-        d.toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" })
+        nowKst().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" })
       );
+      setCountdown(props.countdownTo ? remainingTo(props.countdownTo) : null);
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [props.countdownTo]);
 
   // ⭐ 검은 화면 방지: 비디오 엘리먼트가 마운트된 "후에" 스트림을 연결한다.
-  // (이전에는 렌더 직후 rAF로 연결을 시도해 첫 오픈 시 타이밍이 어긋났음)
   useEffect(() => {
     const v = videoRef.current;
     if (!showCamera || !stream || !v) return;
@@ -182,25 +190,34 @@ export default function CheckinCard(props: Props) {
   return (
     <div className="card hero">
       <span className="mascot-big">
-        {props.alreadyChecked ? (
-          props.wasLate ? "😭" : "🥳"
-        ) : (
-          <KungyaFace avatar={props.avatar} size={72} />
-        )}
+        <StatusKungya status={props.status} avatar={props.avatar} />
       </span>
-      <div className="clock">{clock || "--:--:--"}</div>
+
+      {/* 인증 전에만 남은 시간 표시 (작은 글씨) */}
+      {props.status === "before" && countdown && (
+        <div className={`clock-sm ${countdown.passed ? "passed" : ""}`}>
+          {countdown.passed
+            ? `기준 시각에서 ${countdown.text} 지났어요 😱`
+            : `출근까지 ${countdown.text}`}
+        </div>
+      )}
       <div className="date">{dateLabel}</div>
 
-      {props.alreadyChecked ? (
+      {props.status === "onTime" ? (
         <div>
-          <div className={`badge ${props.wasLate ? "late" : "onTime"}`} style={{ fontSize: 15 }}>
-            {props.wasLate
-              ? `😭 ${props.checkedTime} 지각 (+${props.lateMinutes}분)`
-              : `🥳 ${props.checkedTime} 정시 출근!`}
+          <div className="badge onTime" style={{ fontSize: 15 }}>
+            🥳 정시 출근!
           </div>
           <p className="goal">오늘 출근 도장 완료! 내일도 쿵야 화이팅 💪</p>
         </div>
-      ) : props.hasAbsenceToday ? (
+      ) : props.status === "late" ? (
+        <div>
+          <div className="badge late" style={{ fontSize: 15 }}>
+            😭 지각 (+{props.lateMinutes ?? 0}분)
+          </div>
+          <p className="goal">그래도 도장은 찍었어요. 내일은 정시 출근 가보자고! 🔥</p>
+        </div>
+      ) : props.status === "excused" ? (
         <p className="goal">오늘은 휴가로 등록되어 있어요. 푹 쉬어요 🏠</p>
       ) : (
         <div>
@@ -257,9 +274,8 @@ export default function CheckinCard(props: Props) {
           )}
           <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={onPick} />
           <p className="goal">
-            기준 시각 <b>{props.scheduledTime}</b> — 시각은 서버 기준으로 기록돼요 (조작 불가 🙅)
-            <br />
-            무음 촬영이라 조용한 사무실에서도 안심이에요 🤫
+            시각은 서버 기준으로 기록돼요 (조작 불가 🙅) · 무음 촬영이라 조용한 사무실에서도
+            안심이에요 🤫
             {!props.isWorkdayToday && (
               <>
                 <br />

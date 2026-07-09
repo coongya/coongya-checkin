@@ -750,3 +750,81 @@ label.field select:focus {
   font-size: 12px;
   padding: 7px 12px;
 }
+
+/* 인증 카드 상태 이미지 — 기존 마스코트보다 크게 */
+.hero .status-img {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  display: inline-block;
+}
+.hero .status-fallback {
+  font-size: 96px;
+  line-height: 1.1;
+  display: inline-block;
+}
+.hero .status-fallback img {
+  width: 110px;
+  height: 110px;
+  object-fit: contain;
+}
+
+/* 인증 전 남은 시간 — 기존 시계(40px)의 절반 크기 */
+.hero .clock-sm {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  margin-top: 4px;
+}
+.hero .clock-sm.passed {
+  color: #ffe08a;
+}
+
+/* 그룹 상세 화면 상단 뒤로가기 */
+.backrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 12px;
+}
+.backrow .back-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--card, #fff);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  text-decoration: none;
+  flex: none;
+}
+.backrow h1 {
+  font-size: 19px;
+  font-weight: 800;
+  margin: 0;
+}
+
+/* 오늘 화면의 그룹 목록 행 (버튼) */
+.member-row.group-link {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+}
+.member-row.group-link:last-child {
+  border-bottom: none;
+}
+.member-row.group-link .chev {
+  font-size: 20px;
+  color: var(--ink-soft);
+  flex: none;
+}

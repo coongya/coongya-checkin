@@ -24,11 +24,7 @@ export function TopBar({ groupName }: { groupName: string }) {
             </span>
             쿵야출근단
           </Link>
-          {groupName && (
-            <Link href="/groups" className="grp" title="그룹 전환">
-              · {groupName} ▾
-            </Link>
-          )}
+          {groupName && <span className="grp">· {groupName}</span>}
         </div>
         <button className="btn small plain" onClick={logout}>
           로그아웃
