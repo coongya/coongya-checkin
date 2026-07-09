@@ -10,6 +10,13 @@ function kstDateOf(iso: string | null | undefined): string | null {
   return kstParts(d).date;
 }
 
+/** 나간 멤버는 나간 달(KST)까지만 통계·기록에 표시하고 다음 달부터 제외 */
+export function memberVisibleInMonth(member: Member, month: string): boolean {
+  if (!member.left_at) return true;
+  const leftDate = kstDateOf(member.left_at);
+  return leftDate ? month <= leftDate.slice(0, 7) : true;
+}
+
 export interface DayRecord {
   date: string;
   status: DayStatus;
@@ -46,6 +53,8 @@ export function memberMonthStats(
   const byDateAbsence = new Map(absences.map((a) => [a.work_date, a]));
   // 그룹 참여일 이전은 판정 대상에서 제외 (참여 전 날짜에 벌금이 붙지 않도록)
   const joinedDate = kstDateOf(member.created_at);
+  // 그룹을 나간 뒤의 날짜도 판정 제외 (나간 뒤에 벌금이 쌓이지 않도록)
+  const leftDate = kstDateOf(member.left_at);
 
   const days: DayRecord[] = [];
   let onTimeCount = 0,
@@ -66,6 +75,8 @@ export function memberMonthStats(
       status = "future";
     } else if (joinedDate && date < joinedDate && !checkin && !absence) {
       status = "restDay"; // 참여 전
+    } else if (leftDate && date > leftDate && !checkin && !absence) {
+      status = "restDay"; // 나간 뒤
     } else if (!isWorkday(date, member.workdays)) {
       status = "restDay";
     } else {

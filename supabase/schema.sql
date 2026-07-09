@@ -1,5 +1,5 @@
--- 쿵야출근단 스키마 v3 — 이메일 계정 + 그룹 나가기(소프트 삭제)
--- Supabase SQL Editor에 붙여넣고 실행하세요.
+-- 쿵야출근단 스키마 v3 — 이메일 계정 + 그룹 나가기(소프트 삭제) + PIN 재설정 코드
+-- Supabase SQL Editor에 붙여넣고 실행하세요. (모든 구문이 if not exists라 재실행해도 안전)
 --
 -- ⚠️ v1(members 테이블)에서 업그레이드하는 경우, 먼저 아래 줄의 주석을 풀고 실행해
 --    기존 테이블을 초기화하세요 (테스트 데이터가 모두 삭제됩니다):
@@ -82,6 +82,15 @@ create table if not exists schedule_overrides (
   scheduled_time text not null, -- HH:MM
   created_at timestamptz not null default now(),
   unique (member_id, work_date)
+);
+
+-- PIN 재설정 인증 코드 — 이메일로 발송한 6자리 코드의 해시 (유저당 1개)
+create table if not exists pin_resets (
+  user_id uuid primary key references users(id) on delete cascade,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  attempts int not null default 0,
+  created_at timestamptz not null default now()
 );
 
 create index if not exists idx_memberships_user on memberships(user_id);

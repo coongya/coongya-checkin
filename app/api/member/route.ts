@@ -48,6 +48,9 @@ export async function PATCH(req: NextRequest) {
     if (!isValidPin(body.newPin)) {
       return NextResponse.json({ error: "새 PIN은 숫자 4~6자리예요." }, { status: 400 });
     }
+    if (body.newPin !== body.newPinConfirm) {
+      return NextResponse.json({ error: "PIN과 PIN 확인이 일치하지 않아요." }, { status: 400 });
+    }
     // 현재 PIN 확인 (세션 탈취만으로 PIN을 못 바꾸게) + 시도 제한
     if (!allowRequest(`pin:${auth.user.id}`, 5, 60_000)) {
       return NextResponse.json(

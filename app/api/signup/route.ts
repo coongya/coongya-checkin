@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "잘못된 요청이에요." }, { status: 400 });
 
-  const { username, email, pin, avatar } = body;
+  const { username, email, pin, pinConfirm, avatar } = body;
   const checked = validateUsername(username);
   if ("error" in checked) {
     return NextResponse.json({ error: checked.error }, { status: 400 });
@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
   }
   if (!isValidPin(pin)) {
     return NextResponse.json({ error: "PIN은 숫자 4~6자리로 입력해 주세요." }, { status: 400 });
+  }
+  if (pin !== pinConfirm) {
+    return NextResponse.json({ error: "PIN과 PIN 확인이 일치하지 않아요." }, { status: 400 });
   }
   if (!allowRequest(`signup:${clientIp(req)}`, 10, 60_000)) {
     return NextResponse.json(

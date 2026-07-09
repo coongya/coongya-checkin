@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kstParts, fmtWon, datesOfMonth, isoWeekdayOf } from "@/lib/time";
-import { groupMonthStats, competitionRanks, STATUS_EMOJI } from "@/lib/stats";
+import { groupMonthStats, competitionRanks, memberVisibleInMonth, STATUS_EMOJI } from "@/lib/stats";
 import { TopBar, TabBar } from "@/components/Nav";
 import KungyaFace from "@/components/KungyaFace";
 
@@ -31,7 +31,10 @@ export default async function Stats({
   const month = /^\d{4}-\d{2}$/.test(sp.m ?? "") ? sp.m! : currentMonth;
 
   const d = await db();
-  const members = await d.listMembers(group.id);
+  // 나간 멤버도 나간 달까지는 통계에 표시 (다음 달부터 제외)
+  const members = (await d.listAllMembers(group.id)).filter((m) =>
+    memberVisibleInMonth(m, month)
+  );
   const ids = members.map((m) => m.id);
   const monthDates = datesOfMonth(month);
   const from = monthDates[0];
@@ -91,6 +94,12 @@ export default async function Stats({
                   <td className="nm">
                     <KungyaFace avatar={s.member.avatar} /> {s.member.name}
                     {s.member.id === member.id && " ⭐"}
+                    {s.member.left_at && (
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        {" "}
+                        (나감)
+                      </span>
+                    )}
                   </td>
                   <td>{s.onTimeCount}</td>
                   <td>{s.lateCount > 0 ? `${s.lateCount} (+${s.lateMinutesTotal}분)` : 0}</td>

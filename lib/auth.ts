@@ -57,6 +57,11 @@ export function validateUsername(raw: unknown): { name: string } | { error: stri
   if (name.length < 2 || name.length > 20) {
     return { error: "닉네임은 2~20자로 입력해 주세요." };
   }
+  // 제어문자(줄바꿈 등) 금지 — 화면·이메일 본문 깨짐 방지
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(name)) {
+    return { error: "닉네임에 사용할 수 없는 문자가 있어요." };
+  }
   if (containsProfanity(name)) {
     return { error: "닉네임에 사용할 수 없는 표현이 포함되어 있어요." };
   }

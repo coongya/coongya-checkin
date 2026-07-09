@@ -6,6 +6,7 @@ import { avatarInfo } from "@/lib/types";
 import { TopBar, TabBar } from "@/components/Nav";
 import CheckinCard from "@/components/CheckinCard";
 import KungyaFace from "@/components/KungyaFace";
+import InviteCode from "@/components/InviteCode";
 
 export const dynamic = "force-dynamic";
 
@@ -121,9 +122,9 @@ export default async function Dashboard() {
 
         <div className="card" style={{ textAlign: "center" }}>
           <p className="muted" style={{ margin: "0 0 8px" }}>
-            친구를 초대하려면 초대코드를 공유하세요
+            친구를 초대하려면 초대코드를 공유하세요 (누르면 복사돼요)
           </p>
-          <span className="invite-chip">{group.invite_code}</span>
+          <InviteCode code={group.invite_code} />
         </div>
       </main>
       <TabBar />

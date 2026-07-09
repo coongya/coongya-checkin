@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AVATAR_INFO } from "@/lib/types";
 import type { Absence, ScheduleOverride } from "@/lib/types";
 import KungyaFace from "@/components/KungyaFace";
+import InviteCode from "@/components/InviteCode";
 
 const DOW = [
   { n: "1", label: "월" },
@@ -212,17 +213,23 @@ export function AbsenceManager({ absences }: { absences: Absence[] }) {
 export function PinChange() {
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
+  const [newPinConfirm, setNewPinConfirm] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function save() {
+    if (newPin !== newPinConfirm) {
+      setMsg({ ok: false, text: "새 PIN과 PIN 확인이 일치하지 않아요." });
+      return;
+    }
     setBusy(true);
-    const err = await patchJson("/api/member", "PATCH", { currentPin, newPin });
+    const err = await patchJson("/api/member", "PATCH", { currentPin, newPin, newPinConfirm });
     setBusy(false);
     setMsg(err ? { ok: false, text: err } : { ok: true, text: "PIN을 바꿨어요! 🔒" });
     if (!err) {
       setCurrentPin("");
       setNewPin("");
+      setNewPinConfirm("");
     }
   }
 
@@ -249,8 +256,22 @@ export function PinChange() {
           onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
         />
       </label>
+      <label className="field">
+        새 PIN 확인 (한 번 더 입력)
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          value={newPinConfirm}
+          onChange={(e) => setNewPinConfirm(e.target.value.replace(/\D/g, ""))}
+        />
+      </label>
       {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}
-      <button className="btn" onClick={save} disabled={busy || !currentPin || !newPin}>
+      <button
+        className="btn"
+        onClick={save}
+        disabled={busy || !currentPin || !newPin || !newPinConfirm}
+      >
         변경하기
       </button>
     </div>
@@ -405,11 +426,8 @@ export function GroupSettings(props: {
   return (
     <div className="card">
       <h2>그룹 설정 ⚙️</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        그룹: <b>{props.groupName}</b> · 초대코드{" "}
-        <span className="invite-chip" style={{ fontSize: 14, padding: "4px 10px" }}>
-          {props.inviteCode}
-        </span>
+      <p className="muted" style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        그룹: <b>{props.groupName}</b> · 초대코드 <InviteCode code={props.inviteCode} />
       </p>
       {props.isAdmin ? (
         <>

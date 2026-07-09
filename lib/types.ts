@@ -31,6 +31,7 @@ export interface Member {
   workdays: string; // ISO weekdays, e.g. "12345" (월~금)
   is_admin: boolean;
   created_at: string; // 그룹 참여일
+  left_at: string | null; // 그룹 나간 시각 (null = 활동 중)
 }
 
 export interface Checkin {
