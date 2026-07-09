@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 import { db } from "@/lib/db";
 import { getAuthed } from "@/lib/auth";
 import { kstParts, judgeLate, isWorkday } from "@/lib/time";
+import { purgeOldPhotosOnce } from "@/lib/retention";
 
 export const runtime = "nodejs";
 
@@ -34,11 +36,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "오늘은 이미 출근 도장을 찍었어요! 🎉" }, { status: 409 });
   }
 
-  const ext = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg";
-  const path = `${member.group_id}/${kst.date}/${member.id}-${now.getTime()}.${ext}`;
-  const buf = Buffer.from(await photo.arrayBuffer());
+  // 서버에서 압축·리사이즈 (기본 카메라 앱의 수 MB 사진도 ~100-200KB로 저장)
+  // rotate(): EXIF 회전 반영 후 메타데이터(GPS 등)는 제거됨
+  let buf: Buffer;
   try {
-    await d.uploadPhoto(path, buf, photo.type);
+    buf = await sharp(Buffer.from(await photo.arrayBuffer()))
+      .rotate()
+      .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 78 })
+      .toBuffer();
+  } catch {
+    return NextResponse.json({ error: "이미지를 처리할 수 없어요." }, { status: 400 });
+  }
+  const path = `${member.group_id}/${kst.date}/${member.id}-${now.getTime()}.jpg`;
+  try {
+    await d.uploadPhoto(path, buf, "image/jpeg");
   } catch {
     return NextResponse.json({ error: "사진 업로드에 실패했어요." }, { status: 500 });
   }
@@ -57,6 +69,8 @@ export async function POST(req: NextRequest) {
       is_late: isLate,
       late_minutes: lateMinutes,
     });
+    // 보관 기간 지난 사진 지연 정리 (그룹당 하루 1회, 응답을 막지 않음)
+    purgeOldPhotosOnce(d, member.group_id, kst.date).catch(() => {});
     return NextResponse.json({
       ok: true,
       checkin,

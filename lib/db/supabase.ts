@@ -195,5 +195,34 @@ export function supabaseDb(): DB {
         contentType: data.type || "image/jpeg",
       };
     },
+    async purgeOldPhotos(groupId, beforeDate) {
+      const { data: members } = await sb.from("members").select("id").eq("group_id", groupId);
+      const ids = (members ?? []).map((m: { id: string }) => m.id);
+      if (ids.length === 0) return 0;
+      // 한 번에 최대 200건씩 정리 (체크인마다 호출되므로 점진적으로 비워짐)
+      const { data: rows, error } = await sb
+        .from("checkins")
+        .select("id, photo_path")
+        .in("member_id", ids)
+        .lt("work_date", beforeDate)
+        .not("photo_path", "is", null)
+        .limit(200);
+      fail(error);
+      const targets = (rows ?? []) as { id: string; photo_path: string }[];
+      if (targets.length === 0) return 0;
+      const { error: rmErr } = await sb.storage
+        .from(BUCKET)
+        .remove(targets.map((t) => t.photo_path));
+      fail(rmErr);
+      const { error: upErr } = await sb
+        .from("checkins")
+        .update({ photo_path: null })
+        .in(
+          "id",
+          targets.map((t) => t.id)
+        );
+      fail(upErr);
+      return targets.length;
+    },
   };
 }

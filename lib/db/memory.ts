@@ -157,5 +157,20 @@ export function memoryDb(): DB {
     async getPhoto(path) {
       return store().photos.get(path) ?? null;
     },
+    async purgeOldPhotos(groupId, beforeDate) {
+      const s = store();
+      const memberIds = new Set(
+        s.members.filter((m) => m.group_id === groupId).map((m) => m.id)
+      );
+      let count = 0;
+      for (const c of s.checkins) {
+        if (memberIds.has(c.member_id) && c.work_date < beforeDate && c.photo_path) {
+          s.photos.delete(c.photo_path);
+          c.photo_path = null;
+          count++;
+        }
+      }
+      return count;
+    },
   };
 }
