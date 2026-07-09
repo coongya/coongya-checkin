@@ -1,7 +1,7 @@
 // 로컬 개발/테스트용 인메모리 DB (MOCK_DB=1). 서버 재시작 시 초기화됩니다.
 import { randomUUID } from "node:crypto";
 import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
-import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
+import type { DB, NewGroup, NewUser, NewMembership, NewCheckin } from "./index";
 
 interface MembershipRow {
   id: string;
@@ -22,7 +22,6 @@ interface Store {
   absences: Absence[];
   overrides: ScheduleOverride[];
   photos: Map<string, { data: Buffer; contentType: string }>;
-  pinResets: Map<string, PinReset>;
 }
 
 const g = globalThis as unknown as { __kungyaStore?: Store };
@@ -37,7 +36,6 @@ function store(): Store {
       absences: [],
       overrides: [],
       photos: new Map(),
-      pinResets: new Map(),
     };
   }
   return g.__kungyaStore;
@@ -260,25 +258,6 @@ export function memoryDb(): DB {
       return store().overrides.filter(
         (o) => memberIds.includes(o.member_id) && o.work_date >= from && o.work_date <= to
       );
-    },
-
-    async upsertPinReset(userId, codeHash, expiresAt) {
-      store().pinResets.set(userId, {
-        user_id: userId,
-        code_hash: codeHash,
-        expires_at: expiresAt,
-        attempts: 0,
-      });
-    },
-    async getPinReset(userId) {
-      return store().pinResets.get(userId) ?? null;
-    },
-    async incrementPinResetAttempts(userId) {
-      const r = store().pinResets.get(userId);
-      if (r) r.attempts++;
-    },
-    async deletePinReset(userId) {
-      store().pinResets.delete(userId);
     },
 
     async uploadPhoto(path, data, contentType) {

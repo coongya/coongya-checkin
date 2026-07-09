@@ -1,13 +1,5 @@
 import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
 
-// PIN 재설정 인증 코드 (이메일로 발송, 해시로 저장)
-export interface PinReset {
-  user_id: string;
-  code_hash: string;
-  expires_at: string; // ISO
-  attempts: number;
-}
-
 export interface NewGroup {
   name: string;
   invite_code: string;
@@ -89,12 +81,6 @@ export interface DB {
   deleteOverride(memberId: string, workDate: string): Promise<void>;
   getOverride(memberId: string, workDate: string): Promise<ScheduleOverride | null>;
   listOverrides(memberIds: string[], from: string, to: string): Promise<ScheduleOverride[]>;
-
-  // PIN 재설정 인증 코드 (유저당 1개, upsert)
-  upsertPinReset(userId: string, codeHash: string, expiresAt: string): Promise<void>;
-  getPinReset(userId: string): Promise<PinReset | null>;
-  incrementPinResetAttempts(userId: string): Promise<void>;
-  deletePinReset(userId: string): Promise<void>;
 
   // 사진
   uploadPhoto(path: string, data: Buffer, contentType: string): Promise<void>;

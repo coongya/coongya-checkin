@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
-import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
+import type { DB, NewGroup, NewUser, NewMembership, NewCheckin } from "./index";
 
 const BUCKET = "checkin-photos";
 // memberships + users 조인 셀렉트 — Member 뷰를 만들기 위함
@@ -297,39 +297,6 @@ export function supabaseDb(): DB {
         .lte("work_date", to);
       fail(error);
       return (data as ScheduleOverride[]) ?? [];
-    },
-
-    async upsertPinReset(userId, codeHash, expiresAt) {
-      const { error } = await sb.from("pin_resets").upsert(
-        { user_id: userId, code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
-        { onConflict: "user_id" }
-      );
-      fail(error);
-    },
-    async getPinReset(userId) {
-      const { data } = await sb
-        .from("pin_resets")
-        .select()
-        .eq("user_id", userId)
-        .maybeSingle();
-      return (data as PinReset) ?? null;
-    },
-    async incrementPinResetAttempts(userId) {
-      const { data } = await sb
-        .from("pin_resets")
-        .select("attempts")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (!data) return;
-      const { error } = await sb
-        .from("pin_resets")
-        .update({ attempts: (data.attempts as number) + 1 })
-        .eq("user_id", userId);
-      fail(error);
-    },
-    async deletePinReset(userId) {
-      const { error } = await sb.from("pin_resets").delete().eq("user_id", userId);
-      fail(error);
     },
 
     async uploadPhoto(path, data, contentType) {
