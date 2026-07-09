@@ -38,6 +38,14 @@ export interface Absence {
   created_at: string;
 }
 
+export interface ScheduleOverride {
+  id: string;
+  member_id: string;
+  work_date: string;
+  scheduled_time: string; // HH:MM
+  created_at: string;
+}
+
 export type DayStatus =
   | "onTime" // 정시 출근
   | "late" // 지각

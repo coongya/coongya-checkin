@@ -3,7 +3,13 @@ import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kstParts } from "@/lib/time";
 import { TopBar, TabBar } from "@/components/Nav";
-import { MemberSettings, AbsenceManager, GroupSettings } from "@/components/SettingsForms";
+import {
+  MemberSettings,
+  AbsenceManager,
+  OverrideManager,
+  PinChange,
+  GroupSettings,
+} from "@/components/SettingsForms";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +30,9 @@ export default async function Settings() {
   const absences = (await d.listAbsences([member.id], from, to)).sort((a, b) =>
     a.work_date.localeCompare(b.work_date)
   );
+  const overrides = (await d.listOverrides([member.id], today, to)).sort((a, b) =>
+    a.work_date.localeCompare(b.work_date)
+  );
 
   return (
     <>
@@ -35,6 +44,8 @@ export default async function Settings() {
           avatar={member.avatar}
         />
         <AbsenceManager absences={absences} />
+        <OverrideManager overrides={overrides} defaultTime={member.scheduled_time} />
+        <PinChange />
         <GroupSettings
           isAdmin={member.is_admin}
           fineLate={group.fine_late}

@@ -1,4 +1,4 @@
-import type { Group, Member, Checkin, Absence } from "../types";
+import type { Group, Member, Checkin, Absence, ScheduleOverride } from "../types";
 
 export interface NewGroup {
   name: string;
@@ -51,6 +51,11 @@ export interface DB {
   createAbsence(memberId: string, workDate: string, reason: string): Promise<Absence>;
   deleteAbsence(memberId: string, workDate: string): Promise<void>;
   listAbsences(memberIds: string[], from: string, to: string): Promise<Absence[]>;
+
+  upsertOverride(memberId: string, workDate: string, time: string): Promise<ScheduleOverride>;
+  deleteOverride(memberId: string, workDate: string): Promise<void>;
+  getOverride(memberId: string, workDate: string): Promise<ScheduleOverride | null>;
+  listOverrides(memberIds: string[], from: string, to: string): Promise<ScheduleOverride[]>;
 
   uploadPhoto(path: string, data: Buffer, contentType: string): Promise<void>;
   photoUrl(path: string): string;

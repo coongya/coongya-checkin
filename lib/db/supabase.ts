@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Group, Member, Checkin, Absence } from "../types";
+import type { Group, Member, Checkin, Absence, ScheduleOverride } from "../types";
 import type { DB, NewGroup, NewMember, NewCheckin } from "./index";
 
 const BUCKET = "checkin-photos";
@@ -133,6 +133,47 @@ export function supabaseDb(): DB {
         .lte("work_date", to);
       fail(error);
       return (data as Absence[]) ?? [];
+    },
+
+    async upsertOverride(memberId, workDate, time) {
+      const { data, error } = await sb
+        .from("schedule_overrides")
+        .upsert(
+          { member_id: memberId, work_date: workDate, scheduled_time: time },
+          { onConflict: "member_id,work_date" }
+        )
+        .select()
+        .single();
+      fail(error);
+      return data as ScheduleOverride;
+    },
+    async deleteOverride(memberId, workDate) {
+      const { error } = await sb
+        .from("schedule_overrides")
+        .delete()
+        .eq("member_id", memberId)
+        .eq("work_date", workDate);
+      fail(error);
+    },
+    async getOverride(memberId, workDate) {
+      const { data } = await sb
+        .from("schedule_overrides")
+        .select()
+        .eq("member_id", memberId)
+        .eq("work_date", workDate)
+        .maybeSingle();
+      return (data as ScheduleOverride) ?? null;
+    },
+    async listOverrides(memberIds, from, to) {
+      if (memberIds.length === 0) return [];
+      const { data, error } = await sb
+        .from("schedule_overrides")
+        .select()
+        .in("member_id", memberIds)
+        .gte("work_date", from)
+        .lte("work_date", to);
+      fail(error);
+      return (data as ScheduleOverride[]) ?? [];
     },
 
     async uploadPhoto(path, data, contentType) {

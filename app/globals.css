@@ -205,14 +205,29 @@ label.field input,
 label.field select {
   display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-top: 7px;
   padding: 13px 14px;
-  font-size: 16px;
+  font-size: 16px; /* 16px 미만이면 iOS가 자동 확대함 */
   font-family: inherit;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   background: #f9fafb;
   color: var(--ink);
+}
+/* iOS/모바일에서 date·time 입력이 고유 너비로 화면을 뚫는 문제 방지 */
+label.field input[type="date"],
+label.field input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 50px;
+  text-align: left;
+}
+label.field input[type="date"]::-webkit-date-and-time-value,
+label.field input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
 }
 label.field input:focus,
 label.field select:focus {
@@ -294,8 +309,9 @@ label.field select:focus {
   flex-direction: column;
   gap: 2px;
   height: auto;
-  padding: 10px 12px;
+  padding: 10px 8px;
   flex: 1;
+  min-width: 90px;
 }
 .avatar-grid button.pick .lbl {
   font-size: 12px;

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAuthed, isValidHHMM, isValidWorkdays } from "@/lib/auth";
+import { getAuthed, isValidHHMM, isValidPin, isValidWorkdays } from "@/lib/auth";
+import { hashPin, verifyPin } from "@/lib/session";
+import { allowRequest } from "@/lib/ratelimit";
 import { AVATAR_INFO } from "@/lib/types";
 
 export async function PATCH(req: NextRequest) {
@@ -28,6 +30,22 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "아바타가 올바르지 않아요." }, { status: 400 });
     }
     patch.avatar = body.avatar;
+  }
+  if (body.newPin !== undefined) {
+    if (!isValidPin(body.newPin)) {
+      return NextResponse.json({ error: "새 PIN은 숫자 4~6자리예요." }, { status: 400 });
+    }
+    // 현재 PIN 확인 (세션 탈취만으로 PIN을 못 바꾸게) + 시도 제한
+    if (!allowRequest(`pin:${auth.member.id}`, 5, 60_000)) {
+      return NextResponse.json(
+        { error: "시도가 너무 많아요. 잠시 후 다시 시도해 주세요." },
+        { status: 429 }
+      );
+    }
+    if (typeof body.currentPin !== "string" || !verifyPin(body.currentPin, auth.member.pin_hash)) {
+      return NextResponse.json({ error: "현재 PIN이 일치하지 않아요." }, { status: 403 });
+    }
+    patch.pin_hash = hashPin(body.newPin);
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "변경할 내용이 없어요." }, { status: 400 });

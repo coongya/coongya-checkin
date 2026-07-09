@@ -43,7 +43,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "사진 업로드에 실패했어요." }, { status: 500 });
   }
 
-  const { isLate, lateMinutes } = judgeLate(now, member.scheduled_time);
+  // 해당 일자에 기준 시각 변경이 있으면 그 시각으로 판정
+  const override = await d.getOverride(member.id, kst.date);
+  const effectiveTime = override?.scheduled_time ?? member.scheduled_time;
+  const { isLate, lateMinutes } = judgeLate(now, effectiveTime);
 
   try {
     const checkin = await d.createCheckin({

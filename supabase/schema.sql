@@ -44,7 +44,18 @@ create table if not exists absences (
   unique (member_id, work_date)
 );
 
+-- 특정 일자의 기준 출근 시각 변경 (예: 병원 들렀다 11시 출근)
+create table if not exists schedule_overrides (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references members(id) on delete cascade,
+  work_date date not null,
+  scheduled_time text not null, -- HH:MM
+  created_at timestamptz not null default now(),
+  unique (member_id, work_date)
+);
+
 create index if not exists idx_members_group on members(group_id);
+create index if not exists idx_overrides_member_date on schedule_overrides(member_id, work_date);
 create index if not exists idx_checkins_member_date on checkins(member_id, work_date);
 create index if not exists idx_absences_member_date on absences(member_id, work_date);
 

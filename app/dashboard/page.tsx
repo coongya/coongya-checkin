@@ -21,6 +21,9 @@ export default async function Dashboard() {
   const ids = members.map((m) => m.id);
   const checkins = await d.listCheckins(ids, today, today);
   const absences = await d.listAbsences(ids, today, today);
+  const overrides = await d.listOverrides(ids, today, today);
+  const effectiveTime = (m: (typeof members)[number]) =>
+    overrides.find((o) => o.member_id === m.id)?.scheduled_time ?? m.scheduled_time;
 
   const myCheckin = checkins.find((c) => c.member_id === member.id);
   const myAbsence = absences.find((a) => a.member_id === member.id);
@@ -56,7 +59,7 @@ export default async function Dashboard() {
       <main className="container">
         <CheckinCard
           avatar={member.avatar}
-          scheduledTime={member.scheduled_time}
+          scheduledTime={effectiveTime(member)}
           alreadyChecked={!!myCheckin}
           checkedTime={myCheckin ? fmtTimeKST(myCheckin.checked_at) : undefined}
           wasLate={myCheckin?.is_late}
@@ -78,7 +81,7 @@ export default async function Dashboard() {
                   {m.id === member.id && " (나)"}
                 </div>
                 <div className="sub">
-                  기준 {m.scheduled_time}
+                  기준 {effectiveTime(m)}
                   {c && ` · ${fmtTimeKST(c.checked_at)} 인증`}
                 </div>
               </div>

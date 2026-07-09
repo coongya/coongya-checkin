@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AVATAR_INFO } from "@/lib/types";
-import type { Absence } from "@/lib/types";
+import type { Absence, ScheduleOverride } from "@/lib/types";
 import KungyaFace from "@/components/KungyaFace";
 
 const DOW = [
@@ -182,6 +182,139 @@ export function AbsenceManager({ absences }: { absences: Absence[] }) {
                 <div className="sub">{a.reason}</div>
               </div>
               <button className="btn small danger" onClick={() => remove(a.work_date)} disabled={busy}>
+                삭제
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+export function PinChange() {
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    const err = await patchJson("/api/member", "PATCH", { currentPin, newPin });
+    setBusy(false);
+    setMsg(err ? { ok: false, text: err } : { ok: true, text: "PIN을 바꿨어요! 🔒" });
+    if (!err) {
+      setCurrentPin("");
+      setNewPin("");
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>PIN 변경 🔒</h2>
+      <label className="field">
+        현재 PIN
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          value={currentPin}
+          onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ""))}
+        />
+      </label>
+      <label className="field">
+        새 PIN (숫자 4~6자리)
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          value={newPin}
+          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+        />
+      </label>
+      {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}
+      <button className="btn" onClick={save} disabled={busy || !currentPin || !newPin}>
+        변경하기
+      </button>
+    </div>
+  );
+}
+
+export function OverrideManager({
+  overrides,
+  defaultTime,
+}: {
+  overrides: ScheduleOverride[];
+  defaultTime: string;
+}) {
+  const router = useRouter();
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState(defaultTime);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function add() {
+    if (!date) {
+      setMsg({ ok: false, text: "날짜를 선택해 주세요." });
+      return;
+    }
+    setBusy(true);
+    const err = await patchJson("/api/override", "POST", { date, time });
+    setBusy(false);
+    setMsg(
+      err
+        ? { ok: false, text: err }
+        : { ok: true, text: `${date}의 기준 시각을 ${time}로 바꿨어요 ⏰` }
+    );
+    if (!err) {
+      setDate("");
+      router.refresh();
+    }
+  }
+
+  async function remove(d: string) {
+    setBusy(true);
+    const err = await patchJson("/api/override", "DELETE", { date: d });
+    setBusy(false);
+    if (err) setMsg({ ok: false, text: err });
+    else router.refresh();
+  }
+
+  return (
+    <div className="card">
+      <h2>특정 날짜 기준 시각 변경 ⏰</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        병원·오후 출근 등으로 특정 날짜만 기준 출근 시각이 다를 때 등록해요. 그날의 지각
+        판정은 여기 등록한 시각으로 해요. (지난 날짜·이미 인증한 날은 변경 불가)
+      </p>
+      <label className="field">
+        날짜
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </label>
+      <label className="field">
+        그날의 기준 출근 시각
+        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+      </label>
+      {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}
+      <button className="btn" onClick={add} disabled={busy}>
+        등록하기
+      </button>
+
+      {overrides.length > 0 && (
+        <>
+          <hr className="divider" />
+          <h3>등록된 날짜</h3>
+          {overrides.map((o) => (
+            <div className="member-row" key={o.id}>
+              <div className="who">
+                <div className="nm">{o.work_date}</div>
+                <div className="sub">기준 {o.scheduled_time} (기본 {defaultTime})</div>
+              </div>
+              <button
+                className="btn small danger"
+                onClick={() => remove(o.work_date)}
+                disabled={busy}
+              >
                 삭제
               </button>
             </div>
