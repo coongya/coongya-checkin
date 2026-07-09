@@ -579,8 +579,8 @@ label.field select:focus {
   font-weight: 700;
 }
 .cal .cell.absent {
-  background: var(--red-tint);
-  color: var(--red);
+  background: var(--red);
+  color: #fff;
   font-weight: 700;
 }
 .cal .cell.pending {

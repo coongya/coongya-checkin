@@ -68,17 +68,17 @@ export const AVATAR_INFO: Record<string, AvatarInfo> = {
   onion: {
     label: "양파쿵야",
     emoji: "🧅",
-    img: KUNGYA_IMAGES_READY ? "/kungya/onion.png" : undefined,
+    img: KUNGYA_IMAGES_READY ? "/kungya/onion.svg" : undefined,
   },
   riceball: {
     label: "주먹밥쿵야",
     emoji: "🍙",
-    img: KUNGYA_IMAGES_READY ? "/kungya/riceball.png" : undefined,
+    img: KUNGYA_IMAGES_READY ? "/kungya/riceball.svg" : undefined,
   },
   celery: {
     label: "샐러리쿵야",
     emoji: "🌸",
-    img: KUNGYA_IMAGES_READY ? "/kungya/celery.png" : undefined,
+    img: KUNGYA_IMAGES_READY ? "/kungya/celery.svg" : undefined,
   },
 };
 
