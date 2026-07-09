@@ -129,6 +129,19 @@ export function groupMonthStats(
   );
 }
 
+/**
+ * 경쟁 순위(competition ranking, "1224") 계산.
+ * 정렬된 배열에서 키가 같으면 같은 등수, 다음 등수는 인원수만큼 건너뜀.
+ * SQL의 RANK() OVER (ORDER BY ...) 와 동일한 방식.
+ */
+export function competitionRanks<T>(sorted: T[], keyOf: (x: T) => string): number[] {
+  const ranks: number[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    ranks.push(i > 0 && keyOf(sorted[i]) === keyOf(sorted[i - 1]) ? ranks[i - 1] : i + 1);
+  }
+  return ranks;
+}
+
 export const STATUS_LABEL: Record<DayStatus, string> = {
   onTime: "출근",
   late: "지각",

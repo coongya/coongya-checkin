@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kstParts, fmtWon, datesOfMonth, isoWeekdayOf } from "@/lib/time";
-import { groupMonthStats, STATUS_EMOJI } from "@/lib/stats";
+import { groupMonthStats, competitionRanks, STATUS_EMOJI } from "@/lib/stats";
 import { TopBar, TabBar } from "@/components/Nav";
 import KungyaFace from "@/components/KungyaFace";
 
@@ -41,12 +41,18 @@ export default async function Stats({
   const stats = groupMonthStats(group, members, month, kst.date, checkins, absences);
   const myStats = stats.find((s) => s.member.id === member.id);
 
-  // 랭킹: 벌금 많은 순 / 정시 출근 많은 순
+  // 랭킹: 벌금 많은 순 / 정시 출근 많은 순 — 동점자는 공동 순위 (RANK() 방식)
   const fineRank = [...stats].sort((a, b) => b.totalFine - a.totalFine);
+  const fineRanks = competitionRanks(fineRank, (s) => String(s.totalFine));
   const diligentRank = [...stats].sort(
     (a, b) => b.onTimeCount - a.onTimeCount || a.lateCount - b.lateCount
   );
-  const medals = ["🥇", "🥈", "🥉"];
+  const diligentRanks = competitionRanks(
+    diligentRank,
+    (s) => `${s.onTimeCount}:${s.lateCount}`
+  );
+  const medalFor = (rank: number) =>
+    rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `${rank}`;
 
   // 내 달력
   const firstDow = isoWeekdayOf(`${month}-01`);
@@ -144,7 +150,7 @@ export default async function Stats({
           <h2>벌금왕 랭킹 💸</h2>
           {fineRank.map((s, i) => (
             <div className="rank-row" key={s.member.id}>
-              <span className="medal">{s.totalFine > 0 ? (medals[i] ?? `${i + 1}`) : "😇"}</span>
+              <span className="medal">{s.totalFine > 0 ? medalFor(fineRanks[i]) : "😇"}</span>
               <span className="nm">
                 <KungyaFace avatar={s.member.avatar} /> {s.member.name}
               </span>
@@ -159,7 +165,7 @@ export default async function Stats({
           <h2>성실왕 랭킹 🌟</h2>
           {diligentRank.map((s, i) => (
             <div className="rank-row" key={s.member.id}>
-              <span className="medal">{medals[i] ?? `${i + 1}`}</span>
+              <span className="medal">{medalFor(diligentRanks[i])}</span>
               <span className="nm">
                 <KungyaFace avatar={s.member.avatar} /> {s.member.name}
               </span>
