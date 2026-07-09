@@ -9,6 +9,7 @@ export interface NewGroup {
 
 export interface NewUser {
   username: string;
+  email: string;
   pin_hash: string;
   avatar: string;
 }
@@ -32,10 +33,13 @@ export interface NewCheckin {
 
 export interface DB {
   // 계정
-  createUser(u: NewUser): Promise<User>; // 중복 닉네임 → Error("duplicate_username")
+  createUser(u: NewUser): Promise<User>; // 중복 이메일 → Error("duplicate_email")
   getUser(id: string): Promise<User | null>;
-  getUserByUsername(username: string): Promise<User | null>;
-  updateUser(id: string, patch: Partial<Pick<User, "avatar" | "pin_hash">>): Promise<void>;
+  getUserByEmail(email: string): Promise<User | null>;
+  updateUser(
+    id: string,
+    patch: Partial<Pick<User, "username" | "avatar" | "pin_hash">>
+  ): Promise<void>;
 
   // 그룹
   createGroup(g: NewGroup): Promise<Group>;
@@ -45,8 +49,11 @@ export interface DB {
     id: string,
     patch: Partial<Pick<Group, "name" | "fine_late" | "fine_absent">>
   ): Promise<void>;
+  /** 그룹과 모든 하위 데이터(멤버십·출근 기록·휴가·사진) 삭제 */
+  deleteGroup(id: string): Promise<void>;
 
   // 멤버십 (Member = 멤버십 + 계정 이름/아바타 뷰)
+  // 조회 메서드는 활동 중(left_at 없음)인 멤버십만 반환한다.
   createMembership(m: NewMembership): Promise<Member>; // 중복 → Error("duplicate_membership")
   getMembership(id: string): Promise<Member | null>;
   getMembershipByUserAndGroup(userId: string, groupId: string): Promise<Member | null>;
@@ -54,8 +61,10 @@ export interface DB {
   listMembers(groupId: string): Promise<Member[]>;
   updateMembership(
     id: string,
-    patch: Partial<Pick<Member, "scheduled_time" | "workdays">>
+    patch: Partial<Pick<Member, "scheduled_time" | "workdays" | "is_admin">>
   ): Promise<void>;
+  /** 그룹 나가기 — left_at을 기록하는 소프트 삭제. 기록은 남지만 집계에서 제외된다. */
+  leaveMembership(id: string): Promise<void>;
 
   // 출근/휴가/기준시각 변경 (member_id = membership id)
   createCheckin(c: NewCheckin): Promise<Checkin>;

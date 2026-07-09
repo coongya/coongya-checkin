@@ -47,7 +47,7 @@ export function supabaseDb(): DB {
     async createUser(nu: NewUser) {
       const { data, error } = await sb.from("users").insert(nu).select().single();
       if (error) {
-        if (error.code === "23505") throw new Error("duplicate_username");
+        if (error.code === "23505") throw new Error("duplicate_email");
         throw new Error(error.message);
       }
       return data as User;
@@ -56,8 +56,8 @@ export function supabaseDb(): DB {
       const { data } = await sb.from("users").select().eq("id", id).maybeSingle();
       return (data as User) ?? null;
     },
-    async getUserByUsername(username) {
-      const { data } = await sb.from("users").select().eq("username", username).maybeSingle();
+    async getUserByEmail(email) {
+      const { data } = await sb.from("users").select().eq("email", email).maybeSingle();
       return (data as User) ?? null;
     },
     async updateUser(id, patch) {
@@ -86,6 +86,40 @@ export function supabaseDb(): DB {
       const { error } = await sb.from("groups").update(patch).eq("id", id);
       fail(error);
     },
+    async deleteGroup(id) {
+      // 이 그룹 체크인만 참조하는 사진을 Storage에서 삭제 (다른 그룹 체크인과 공유 가능)
+      const { data: ms } = await sb.from("memberships").select("id").eq("group_id", id);
+      const memberIds = ((ms ?? []) as { id: string }[]).map((m) => m.id);
+      if (memberIds.length > 0) {
+        const { data: rows } = await sb
+          .from("checkins")
+          .select("photo_path")
+          .in("member_id", memberIds)
+          .not("photo_path", "is", null);
+        const paths = [
+          ...new Set(((rows ?? []) as { photo_path: string }[]).map((r) => r.photo_path)),
+        ];
+        if (paths.length > 0) {
+          const { data: refs } = await sb
+            .from("checkins")
+            .select("member_id, photo_path")
+            .in("photo_path", paths);
+          const memberSet = new Set(memberIds);
+          const shared = new Set(
+            ((refs ?? []) as { member_id: string; photo_path: string }[])
+              .filter((r) => !memberSet.has(r.member_id))
+              .map((r) => r.photo_path)
+          );
+          const removable = paths.filter((p) => !shared.has(p));
+          if (removable.length > 0) {
+            await sb.storage.from(BUCKET).remove(removable);
+          }
+        }
+      }
+      // 그룹 행 삭제 — memberships/checkins/absences/overrides는 FK cascade로 함께 삭제
+      const { error } = await sb.from("groups").delete().eq("id", id);
+      fail(error);
+    },
 
     async createMembership(nm: NewMembership) {
       const { data, error } = await sb
@@ -104,6 +138,7 @@ export function supabaseDb(): DB {
         .from("memberships")
         .select(MEMBER_SELECT)
         .eq("id", id)
+        .is("left_at", null)
         .maybeSingle();
       return data ? toMember(data as MembershipJoined) : null;
     },
@@ -113,6 +148,7 @@ export function supabaseDb(): DB {
         .select(MEMBER_SELECT)
         .eq("user_id", userId)
         .eq("group_id", groupId)
+        .is("left_at", null)
         .maybeSingle();
       return data ? toMember(data as MembershipJoined) : null;
     },
@@ -121,6 +157,7 @@ export function supabaseDb(): DB {
         .from("memberships")
         .select("*, users(username, avatar), groups(*)")
         .eq("user_id", userId)
+        .is("left_at", null)
         .order("created_at");
       fail(error);
       return ((data ?? []) as (MembershipJoined & { groups: Group })[])
@@ -132,12 +169,20 @@ export function supabaseDb(): DB {
         .from("memberships")
         .select(MEMBER_SELECT)
         .eq("group_id", groupId)
+        .is("left_at", null)
         .order("created_at");
       fail(error);
       return ((data ?? []) as MembershipJoined[]).map(toMember);
     },
     async updateMembership(id, patch) {
       const { error } = await sb.from("memberships").update(patch).eq("id", id);
+      fail(error);
+    },
+    async leaveMembership(id) {
+      const { error } = await sb
+        .from("memberships")
+        .update({ left_at: new Date().toISOString() })
+        .eq("id", id);
       fail(error);
     },
 

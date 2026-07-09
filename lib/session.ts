@@ -72,6 +72,11 @@ export async function getCurrentGroupId(): Promise<string | null> {
   return store.get(GROUP_COOKIE)?.value ?? null;
 }
 
+export async function clearCurrentGroupId() {
+  const store = await cookies();
+  store.delete(GROUP_COOKIE);
+}
+
 export async function setCurrentGroupId(groupId: string) {
   const store = await cookies();
   store.set(GROUP_COOKIE, groupId, {

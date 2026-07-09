@@ -37,11 +37,13 @@ export function MemberSettings(props: {
   scheduledTime: string;
   workdays: string;
   avatar: string;
+  username: string;
 }) {
   const router = useRouter();
   const [time, setTime] = useState(props.scheduledTime);
   const [workdays, setWorkdays] = useState(props.workdays);
   const [avatar, setAvatar] = useState(props.avatar);
+  const [username, setUsername] = useState(props.username);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -59,11 +61,16 @@ export function MemberSettings(props: {
       setMsg({ ok: false, text: "근무 요일을 하나 이상 선택해 주세요." });
       return;
     }
+    if (username.trim().length < 2) {
+      setMsg({ ok: false, text: "닉네임은 2~20자로 입력해 주세요." });
+      return;
+    }
     setBusy(true);
     const err = await patchJson("/api/member", "PATCH", {
       scheduledTime: time,
       workdays,
       avatar,
+      username,
     });
     setBusy(false);
     setMsg(err ? { ok: false, text: err } : { ok: true, text: "저장했어요! 🎉" });
@@ -73,6 +80,15 @@ export function MemberSettings(props: {
   return (
     <div className="card">
       <h2>내 설정 🧅</h2>
+      <label className="field">
+        닉네임 (2~20자 · 모든 그룹에 적용)
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="예: 클레어"
+          maxLength={20}
+        />
+      </label>
       <label className="field">
         기준 출근 시각
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
@@ -334,20 +350,56 @@ export function GroupSettings(props: {
   groupName: string;
 }) {
   const router = useRouter();
+  const [name, setName] = useState(props.groupName);
   const [fineLate, setFineLate] = useState(String(props.fineLate));
   const [fineAbsent, setFineAbsent] = useState(String(props.fineAbsent));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function save() {
+    if (!name.trim()) {
+      setMsg({ ok: false, text: "그룹 이름을 입력해 주세요." });
+      return;
+    }
     setBusy(true);
     const err = await patchJson("/api/group", "PATCH", {
+      name,
       fineLate: Number(fineLate),
       fineAbsent: Number(fineAbsent),
     });
     setBusy(false);
     setMsg(err ? { ok: false, text: err } : { ok: true, text: "저장했어요! 🎉" });
     if (!err) router.refresh();
+  }
+
+  async function removeGroup() {
+    const sure = confirm(
+      `정말 "${props.groupName}" 그룹을 삭제할까요?\n\n멤버·출근 기록·사진 등 그룹의 모든 데이터가 삭제되고 되돌릴 수 없어요.`
+    );
+    if (!sure) return;
+    setBusy(true);
+    const err = await patchJson("/api/group", "DELETE", {});
+    setBusy(false);
+    if (err) setMsg({ ok: false, text: err });
+    else {
+      router.push("/groups");
+      router.refresh();
+    }
+  }
+
+  async function leaveGroup() {
+    const sure = confirm(
+      `"${props.groupName}" 그룹에서 나갈까요?\n\n지금까지의 기록은 남지만, 나간 뒤에는 그룹 화면·집계·랭킹에서 제외돼요.`
+    );
+    if (!sure) return;
+    setBusy(true);
+    const err = await patchJson("/api/leave", "POST", {});
+    setBusy(false);
+    if (err) setMsg({ ok: false, text: err });
+    else {
+      router.push("/groups");
+      router.refresh();
+    }
   }
 
   return (
@@ -361,6 +413,14 @@ export function GroupSettings(props: {
       </p>
       {props.isAdmin ? (
         <>
+          <label className="field">
+            그룹 이름
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={30}
+            />
+          </label>
           <label className="field">
             지각 벌금 (원)
             <input
@@ -387,8 +447,26 @@ export function GroupSettings(props: {
           </button>
         </>
       ) : (
-        <p className="muted">벌금 설정은 그룹을 만든 관리자만 변경할 수 있어요.</p>
+        <>
+          {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}
+          <p className="muted">그룹 이름·벌금 설정은 그룹 관리자만 변경할 수 있어요.</p>
+        </>
       )}
+
+      <hr className="divider" />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="btn small danger" onClick={leaveGroup} disabled={busy}>
+          그룹 나가기 👋
+        </button>
+        {props.isAdmin && (
+          <button className="btn small danger" onClick={removeGroup} disabled={busy}>
+            그룹 삭제하기 🗑️
+          </button>
+        )}
+      </div>
+      <p className="muted" style={{ marginBottom: 0 }}>
+        나가면 기록은 남지만 집계에서 제외돼요. 삭제하면 그룹의 모든 데이터가 사라져요.
+      </p>
     </div>
   );
 }

@@ -7,22 +7,33 @@ import KungyaFace from "@/components/KungyaFace";
 
 type Mode = "login" | "signup";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function AuthForms() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState("");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [avatar, setAvatar] = useState("onion");
   const [busy, setBusy] = useState(false);
 
   async function submit() {
-    setBusy(true);
     setError("");
+    if (!EMAIL_RE.test(email.trim())) {
+      setError("이메일 주소 형식을 확인해 주세요.");
+      return;
+    }
+    if (mode === "signup" && username.trim().length < 2) {
+      setError("닉네임은 2~20자로 입력해 주세요.");
+      return;
+    }
+    setBusy(true);
     try {
       const endpoint = mode === "login" ? "/api/login" : "/api/signup";
       const payload =
-        mode === "login" ? { username, pin } : { username, pin, avatar };
+        mode === "login" ? { email, pin } : { username, email, pin, avatar };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,13 +64,28 @@ export default function AuthForms() {
         </button>
       </div>
 
+      {mode === "signup" && (
+        <label className="field">
+          닉네임 (2~20자)
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="예: 클레어"
+            maxLength={20}
+          />
+        </label>
+      )}
+
       <label className="field">
-        닉네임
+        이메일
         <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="예: 클레어"
-          maxLength={20}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="예: kungya@example.com"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          maxLength={254}
         />
       </label>
 
@@ -105,8 +131,8 @@ export default function AuthForms() {
 
       {mode === "signup" && (
         <p className="muted" style={{ marginTop: 10 }}>
-          가입 후 그룹을 만들거나 초대코드로 참여할 수 있어요. 한 계정으로 여러 그룹에
-          참여할 수 있어요!
+          이메일은 로그인 아이디로만 쓰여요. 가입 후 그룹을 만들거나 초대코드로 참여할 수
+          있어요. 한 계정으로 여러 그룹에 참여할 수 있어요!
         </p>
       )}
     </div>

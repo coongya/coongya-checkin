@@ -1,14 +1,26 @@
--- 쿵야출근단 스키마 v2 — 계정(users)과 그룹 멤버십(memberships) 분리
+-- 쿵야출근단 스키마 v3 — 이메일 계정 + 그룹 나가기(소프트 삭제)
 -- Supabase SQL Editor에 붙여넣고 실행하세요.
 --
 -- ⚠️ v1(members 테이블)에서 업그레이드하는 경우, 먼저 아래 줄의 주석을 풀고 실행해
 --    기존 테이블을 초기화하세요 (테스트 데이터가 모두 삭제됩니다):
 -- drop table if exists schedule_overrides, absences, checkins, members, memberships, users, groups cascade;
+--
+-- ⚠️ v2에서 업그레이드하는 경우 아래 마이그레이션 블록의 주석을 풀고 실행하세요:
+-- alter table users add column if not exists email text;
+-- update users set email = username || '@migrate.invalid' where email is null; -- 기존 유저는 임시 이메일 (직접 정리 필요)
+-- alter table users alter column email set not null;
+-- alter table users add constraint users_email_key unique (email);
+-- alter table users drop constraint if exists users_username_key;
+-- alter table memberships add column if not exists left_at timestamptz;
+-- alter table memberships drop constraint if exists memberships_user_id_group_id_key;
+-- create unique index if not exists idx_memberships_active_unique
+--   on memberships(user_id, group_id) where (left_at is null);
 
--- 계정: 앱 전체에서 하나. 닉네임은 전역 유니크.
+-- 계정: 앱 전체에서 하나. 이메일이 전역 유니크(로그인 ID), 닉네임은 중복 허용.
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
-  username text not null unique,
+  username text not null,           -- 닉네임 (중복 허용, 표시용)
+  email text not null unique,       -- 로그인 ID
   pin_hash text not null,
   avatar text not null default 'onion',
   created_at timestamptz not null default now()
@@ -25,6 +37,7 @@ create table if not exists groups (
 );
 
 -- 멤버십: 한 계정이 여러 그룹에 참여. 그룹별 기준 시각·근무 요일은 여기에.
+-- left_at이 채워지면 "나간" 멤버십 — 데이터(체크인 등)는 남지만 집계·화면에서 제외.
 create table if not exists memberships (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,
@@ -33,8 +46,12 @@ create table if not exists memberships (
   workdays text not null default '12345',       -- ISO 요일 (월=1 ... 일=7)
   is_admin boolean not null default false,
   created_at timestamptz not null default now(), -- 그룹 참여일 (이전 날짜는 벌금 제외)
-  unique (user_id, group_id)
+  left_at timestamptz                            -- 그룹 나간 시각 (null = 활동 중)
 );
+
+-- 활동 중인 멤버십만 (user, group) 쌍이 유일 — 나갔다가 다시 참여하면 새 행이 생긴다
+create unique index if not exists idx_memberships_active_unique
+  on memberships(user_id, group_id) where (left_at is null);
 
 -- 출근 기록: member_id는 membership id를 가리킴
 create table if not exists checkins (

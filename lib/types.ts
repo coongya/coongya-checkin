@@ -9,9 +9,11 @@ export interface Group {
 }
 
 // 계정 — 앱 전체에서 하나, 여러 그룹에 참여 가능
+// email이 로그인 ID (전역 유니크), username(닉네임)은 중복 허용 표시용
 export interface User {
   id: string;
   username: string;
+  email: string;
   pin_hash: string;
   avatar: string;
   created_at: string;

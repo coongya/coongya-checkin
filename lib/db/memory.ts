@@ -11,6 +11,7 @@ interface MembershipRow {
   workdays: string;
   is_admin: boolean;
   created_at: string;
+  left_at: string | null; // 나간 시각 (null = 활동 중)
 }
 
 interface Store {
@@ -58,8 +59,8 @@ function toMember(row: MembershipRow): Member {
 export function memoryDb(): DB {
   return {
     async createUser(nu: NewUser) {
-      if (store().users.some((u) => u.username === nu.username)) {
-        throw new Error("duplicate_username");
+      if (store().users.some((u) => u.email === nu.email)) {
+        throw new Error("duplicate_email");
       }
       const u: User = { id: randomUUID(), created_at: new Date().toISOString(), ...nu };
       store().users.push(u);
@@ -68,8 +69,8 @@ export function memoryDb(): DB {
     async getUser(id) {
       return store().users.find((u) => u.id === id) ?? null;
     },
-    async getUserByUsername(username) {
-      return store().users.find((u) => u.username === username) ?? null;
+    async getUserByEmail(email) {
+      return store().users.find((u) => u.email === email) ?? null;
     },
     async updateUser(id, patch) {
       const u = store().users.find((x) => x.id === id);
@@ -99,11 +100,32 @@ export function memoryDb(): DB {
       const grp = store().groups.find((x) => x.id === id);
       if (grp) Object.assign(grp, patch);
     },
+    async deleteGroup(id) {
+      const s = store();
+      const memberIds = new Set(
+        s.memberships.filter((m) => m.group_id === id).map((m) => m.id)
+      );
+      // 이 그룹 체크인만 참조하는 사진 삭제 (같은 사진을 다른 그룹 체크인이 공유할 수 있음)
+      const targetPaths = new Set(
+        s.checkins
+          .filter((c) => memberIds.has(c.member_id) && c.photo_path)
+          .map((c) => c.photo_path!)
+      );
+      for (const c of s.checkins) {
+        if (!memberIds.has(c.member_id) && c.photo_path) targetPaths.delete(c.photo_path);
+      }
+      for (const p of targetPaths) s.photos.delete(p);
+      s.checkins = s.checkins.filter((c) => !memberIds.has(c.member_id));
+      s.absences = s.absences.filter((a) => !memberIds.has(a.member_id));
+      s.overrides = s.overrides.filter((o) => !memberIds.has(o.member_id));
+      s.memberships = s.memberships.filter((m) => m.group_id !== id);
+      s.groups = s.groups.filter((g) => g.id !== id);
+    },
 
     async createMembership(nm: NewMembership) {
       if (
         store().memberships.some(
-          (m) => m.user_id === nm.user_id && m.group_id === nm.group_id
+          (m) => m.user_id === nm.user_id && m.group_id === nm.group_id && !m.left_at
         )
       ) {
         throw new Error("duplicate_membership");
@@ -111,24 +133,25 @@ export function memoryDb(): DB {
       const row: MembershipRow = {
         id: randomUUID(),
         created_at: new Date().toISOString(),
+        left_at: null,
         ...nm,
       };
       store().memberships.push(row);
       return toMember(row);
     },
     async getMembership(id) {
-      const row = store().memberships.find((m) => m.id === id);
+      const row = store().memberships.find((m) => m.id === id && !m.left_at);
       return row ? toMember(row) : null;
     },
     async getMembershipByUserAndGroup(userId, groupId) {
       const row = store().memberships.find(
-        (m) => m.user_id === userId && m.group_id === groupId
+        (m) => m.user_id === userId && m.group_id === groupId && !m.left_at
       );
       return row ? toMember(row) : null;
     },
     async listMembershipsByUser(userId) {
       return store()
-        .memberships.filter((m) => m.user_id === userId)
+        .memberships.filter((m) => m.user_id === userId && !m.left_at)
         .map((row) => ({
           member: toMember(row),
           group: store().groups.find((gr) => gr.id === row.group_id)!,
@@ -137,12 +160,16 @@ export function memoryDb(): DB {
     },
     async listMembers(groupId) {
       return store()
-        .memberships.filter((m) => m.group_id === groupId)
+        .memberships.filter((m) => m.group_id === groupId && !m.left_at)
         .map(toMember);
     },
     async updateMembership(id, patch) {
       const m = store().memberships.find((x) => x.id === id);
       if (m) Object.assign(m, patch);
+    },
+    async leaveMembership(id) {
+      const m = store().memberships.find((x) => x.id === id);
+      if (m) m.left_at = new Date().toISOString();
     },
 
     async createCheckin(nc: NewCheckin) {

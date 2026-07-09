@@ -7,9 +7,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "잘못된 요청이에요." }, { status: 400 });
 
-  const { username, pin } = body;
-  if (!username?.trim() || typeof pin !== "string") {
-    return NextResponse.json({ error: "닉네임과 PIN을 입력해 주세요." }, { status: 400 });
+  const { email, pin } = body;
+  if (typeof email !== "string" || !email.trim() || typeof pin !== "string") {
+    return NextResponse.json({ error: "이메일과 PIN을 입력해 주세요." }, { status: 400 });
   }
 
   // PIN 무차별 대입 방지: IP당 분당 10회
@@ -21,9 +21,9 @@ export async function POST(req: NextRequest) {
   }
 
   const d = await db();
-  const user = await d.getUserByUsername(username.trim());
+  const user = await d.getUserByEmail(email.trim().toLowerCase());
   if (!user || !verifyPin(pin, user.pin_hash)) {
-    return NextResponse.json({ error: "닉네임 또는 PIN이 일치하지 않아요." }, { status: 401 });
+    return NextResponse.json({ error: "이메일 또는 PIN이 일치하지 않아요." }, { status: 401 });
   }
 
   await setSession({ userId: user.id });

@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { getSession, getCurrentGroupId } from "./session";
+import { containsProfanity } from "./moderation";
 import type { Group, User, Member } from "./types";
 
 export interface Authed {
@@ -41,6 +42,25 @@ export function isValidHHMM(s: unknown): s is string {
 
 export function isValidPin(s: unknown): s is string {
   return typeof s === "string" && /^\d{4,6}$/.test(s);
+}
+
+export function isValidEmail(s: unknown): s is string {
+  return typeof s === "string" && s.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
+/** 닉네임 검증 (2~20자, 비속어 금지). 통과하면 다듬은 닉네임, 실패하면 에러 메시지 */
+export function validateUsername(raw: unknown): { name: string } | { error: string } {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return { error: "닉네임을 입력해 주세요." };
+  }
+  const name = raw.trim();
+  if (name.length < 2 || name.length > 20) {
+    return { error: "닉네임은 2~20자로 입력해 주세요." };
+  }
+  if (containsProfanity(name)) {
+    return { error: "닉네임에 사용할 수 없는 표현이 포함되어 있어요." };
+  }
+  return { name };
 }
 
 export function isValidWorkdays(s: unknown): s is string {
