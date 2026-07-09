@@ -164,6 +164,7 @@ export function AbsenceManager({ absences }: { absences: Absence[] }) {
           <option>재택</option>
           <option>교육</option>
           <option>아파요</option>
+          <option>출장</option>
         </select>
       </label>
       {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}

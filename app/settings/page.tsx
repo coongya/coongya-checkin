@@ -16,11 +16,12 @@ export const dynamic = "force-dynamic";
 export default async function Settings() {
   const auth = await getAuthed();
   if (!auth) redirect("/");
-  const { member, group } = auth;
+  if (!auth.current) redirect("/groups");
+  const { member, group } = auth.current;
 
   const d = await db();
   const today = kstParts().date;
-  // 오늘 이후(오늘 포함) 등록된 휴가 + 최근 30일
+  // 최근 30일 ~ 향후 1년의 등록 내역
   const past = new Date();
   past.setDate(past.getDate() - 30);
   const from = past.toISOString().slice(0, 10);
@@ -38,10 +39,14 @@ export default async function Settings() {
     <>
       <TopBar groupName={group.name} />
       <main className="container">
+        <p className="muted" style={{ margin: "0 0 10px" }}>
+          기준 시각·근무 요일·휴가는 <b>{group.name}</b> 그룹에만 적용돼요. 캐릭터와 PIN은
+          계정 전체에 적용돼요.
+        </p>
         <MemberSettings
           scheduledTime={member.scheduled_time}
           workdays={member.workdays}
-          avatar={member.avatar}
+          avatar={auth.user.avatar}
         />
         <AbsenceManager absences={absences} />
         <OverrideManager overrides={overrides} defaultTime={member.scheduled_time} />

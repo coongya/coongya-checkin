@@ -1,4 +1,4 @@
-import type { Group, Member, Checkin, Absence, ScheduleOverride } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
 
 export interface NewGroup {
   name: string;
@@ -7,18 +7,22 @@ export interface NewGroup {
   fine_absent: number;
 }
 
-export interface NewMember {
-  group_id: string;
-  name: string;
+export interface NewUser {
+  username: string;
   pin_hash: string;
+  avatar: string;
+}
+
+export interface NewMembership {
+  user_id: string;
+  group_id: string;
   scheduled_time: string;
   workdays: string;
-  avatar: string;
   is_admin: boolean;
 }
 
 export interface NewCheckin {
-  member_id: string;
+  member_id: string; // membership id
   work_date: string;
   checked_at: string;
   photo_path: string | null;
@@ -27,6 +31,13 @@ export interface NewCheckin {
 }
 
 export interface DB {
+  // 계정
+  createUser(u: NewUser): Promise<User>; // 중복 닉네임 → Error("duplicate_username")
+  getUser(id: string): Promise<User | null>;
+  getUserByUsername(username: string): Promise<User | null>;
+  updateUser(id: string, patch: Partial<Pick<User, "avatar" | "pin_hash">>): Promise<void>;
+
+  // 그룹
   createGroup(g: NewGroup): Promise<Group>;
   getGroup(id: string): Promise<Group | null>;
   getGroupByInviteCode(code: string): Promise<Group | null>;
@@ -35,15 +46,18 @@ export interface DB {
     patch: Partial<Pick<Group, "name" | "fine_late" | "fine_absent">>
   ): Promise<void>;
 
-  createMember(m: NewMember): Promise<Member>;
-  getMember(id: string): Promise<Member | null>;
-  getMemberByName(groupId: string, name: string): Promise<Member | null>;
+  // 멤버십 (Member = 멤버십 + 계정 이름/아바타 뷰)
+  createMembership(m: NewMembership): Promise<Member>; // 중복 → Error("duplicate_membership")
+  getMembership(id: string): Promise<Member | null>;
+  getMembershipByUserAndGroup(userId: string, groupId: string): Promise<Member | null>;
+  listMembershipsByUser(userId: string): Promise<{ member: Member; group: Group }[]>;
   listMembers(groupId: string): Promise<Member[]>;
-  updateMember(
+  updateMembership(
     id: string,
-    patch: Partial<Pick<Member, "scheduled_time" | "workdays" | "avatar" | "pin_hash">>
+    patch: Partial<Pick<Member, "scheduled_time" | "workdays">>
   ): Promise<void>;
 
+  // 출근/휴가/기준시각 변경 (member_id = membership id)
   createCheckin(c: NewCheckin): Promise<Checkin>;
   getCheckin(memberId: string, workDate: string): Promise<Checkin | null>;
   listCheckins(memberIds: string[], from: string, to: string): Promise<Checkin[]>;
@@ -57,6 +71,7 @@ export interface DB {
   getOverride(memberId: string, workDate: string): Promise<ScheduleOverride | null>;
   listOverrides(memberIds: string[], from: string, to: string): Promise<ScheduleOverride[]>;
 
+  // 사진
   uploadPhoto(path: string, data: Buffer, contentType: string): Promise<void>;
   photoUrl(path: string): string;
   getPhoto(path: string): Promise<{ data: Buffer; contentType: string } | null>;

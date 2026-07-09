@@ -22,7 +22,8 @@ export default async function Stats({
 }) {
   const auth = await getAuthed();
   if (!auth) redirect("/");
-  const { member, group } = auth;
+  if (!auth.current) redirect("/groups");
+  const { member, group } = auth.current;
 
   const kst = kstParts();
   const currentMonth = kst.date.slice(0, 7);
@@ -118,24 +119,40 @@ export default async function Stats({
               {Array.from({ length: firstDow - 1 }).map((_, i) => (
                 <div key={`sp${i}`} style={{ background: "transparent" }} />
               ))}
-              {myStats.days.map((day) => (
-                <div
-                  key={day.date}
-                  className={`cell ${["onTime", "late", "excused", "absent", "pending"].includes(day.status) ? day.status : ""}`}
-                  title={`${day.date} ${STATUS_EMOJI[day.status]}`}
-                >
-                  {day.status === "onTime" ? (
-                    <>
-                      <span className="stamp">
-                        <KungyaFace avatar={member.avatar} />
-                      </span>
-                      <span className="dnum">{parseInt(day.date.slice(8), 10)}</span>
-                    </>
-                  ) : (
-                    parseInt(day.date.slice(8), 10)
-                  )}
-                </div>
-              ))}
+              {myStats.days.map((day) => {
+                // 미래 날짜라도 휴가가 등록되어 있으면 미리 🏝 도장 표시
+                const excusedLike =
+                  day.status === "excused" || (day.status === "future" && !!day.absence);
+                const cls = excusedLike
+                  ? "excused"
+                  : ["onTime", "late", "absent", "pending"].includes(day.status)
+                    ? day.status
+                    : "";
+                const dnum = parseInt(day.date.slice(8), 10);
+                return (
+                  <div
+                    key={day.date}
+                    className={`cell ${cls}`}
+                    title={`${day.date} ${excusedLike ? `🏝 ${day.absence?.reason ?? ""}` : STATUS_EMOJI[day.status]}`}
+                  >
+                    {day.status === "onTime" ? (
+                      <>
+                        <span className="stamp">
+                          <KungyaFace avatar={member.avatar} />
+                        </span>
+                        <span className="dnum">{dnum}</span>
+                      </>
+                    ) : excusedLike ? (
+                      <>
+                        <span className="stamp">🏝</span>
+                        <span className="dnum">{dnum}</span>
+                      </>
+                    ) : (
+                      dnum
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <div className="legend">
               <span className="l-on">정시 출근</span>

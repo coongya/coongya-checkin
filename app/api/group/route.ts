@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAuthed } from "@/lib/auth";
 
+// 현재 그룹의 설정 변경 (관리자 전용)
 export async function PATCH(req: NextRequest) {
   const auth = await getAuthed();
-  if (!auth) return NextResponse.json({ error: "로그인이 필요해요." }, { status: 401 });
-  if (!auth.member.is_admin) {
+  if (!auth?.current) {
+    return NextResponse.json({ error: "로그인이 필요해요." }, { status: 401 });
+  }
+  if (!auth.current.member.is_admin) {
     return NextResponse.json({ error: "그룹 관리자만 변경할 수 있어요." }, { status: 403 });
   }
 
@@ -26,13 +29,13 @@ export async function PATCH(req: NextRequest) {
     }
   }
   if (typeof body.name === "string" && body.name.trim()) {
-    patch.name = body.name.trim();
+    patch.name = body.name.trim().slice(0, 30);
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "변경할 내용이 없어요." }, { status: 400 });
   }
 
   const d = await db();
-  await d.updateGroup(auth.group.id, patch);
+  await d.updateGroup(auth.current.group.id, patch);
   return NextResponse.json({ ok: true });
 }

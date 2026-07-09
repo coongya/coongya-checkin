@@ -4,6 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import KungyaFace from "@/components/KungyaFace";
 
+interface GroupOption {
+  groupId: string;
+  groupName: string;
+  alreadyChecked: boolean;
+}
+
 interface Props {
   avatar: string;
   scheduledTime: string;
@@ -13,6 +19,8 @@ interface Props {
   lateMinutes?: number;
   isWorkdayToday: boolean;
   hasAbsenceToday: boolean;
+  currentGroupId: string;
+  groupOptions: GroupOption[]; // 참여 중인 모든 그룹 (멀티 인증용)
 }
 
 function nowKst(): Date {
@@ -23,13 +31,17 @@ export default function CheckinCard(props: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("environment");
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [selected, setSelected] = useState<string[]>(
+    props.groupOptions.filter((g) => !g.alreadyChecked).map((g) => g.groupId)
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [clock, setClock] = useState("");
   const [dateLabel, setDateLabel] = useState("");
 
@@ -50,9 +62,23 @@ export default function CheckinCard(props: Props) {
     return () => clearInterval(id);
   }, []);
 
+  // ⭐ 검은 화면 방지: 비디오 엘리먼트가 마운트된 "후에" 스트림을 연결한다.
+  // (이전에는 렌더 직후 rAF로 연결을 시도해 첫 오픈 시 타이밍이 어긋났음)
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!showCamera || !stream || !v) return;
+    v.srcObject = stream;
+    const play = () => v.play().catch(() => {});
+    play();
+    v.addEventListener("loadedmetadata", play);
+    return () => v.removeEventListener("loadedmetadata", play);
+  }, [showCamera, stream]);
+
   const closeCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
+    setStream((s) => {
+      s?.getTracks().forEach((t) => t.stop());
+      return null;
+    });
     setShowCamera(false);
   }, []);
 
@@ -62,22 +88,15 @@ export default function CheckinCard(props: Props) {
   async function openCamera(nextFacing?: "user" | "environment") {
     const f = nextFacing ?? facing;
     try {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream?.getTracks().forEach((t) => t.stop());
+      const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: f, width: { ideal: 1280 }, height: { ideal: 1280 } },
         audio: false, // 오디오 미사용 → 셔터음 없음
       });
-      streamRef.current = stream;
+      setStream(s);
       setFacing(f);
       setShowCamera(true);
       setError("");
-      // 렌더 후 비디오에 스트림 연결
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      });
     } catch {
       // 권한 거부/미지원 → 기본 카메라 앱 폴백
       setShowCamera(false);
@@ -116,18 +135,37 @@ export default function CheckinCard(props: Props) {
     setError("");
   }
 
+  function toggleGroup(id: string) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
   async function submit() {
     if (!file) return;
+    if (selected.length === 0) {
+      setError("인증할 그룹을 하나 이상 선택해 주세요.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const fd = new FormData();
       fd.append("photo", file);
+      fd.append("groups", JSON.stringify(selected));
       const res = await fetch("/api/checkin", { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "인증에 실패했어요.");
+      if (!res.ok && !data.ok) {
+        setError(data.error || data.results?.[0]?.error || "인증에 실패했어요.");
         return;
+      }
+      const failed = (data.results ?? []).filter((r: { ok: boolean }) => !r.ok);
+      if (failed.length > 0) {
+        setNotice(
+          failed
+            .map((r: { groupName: string; error: string }) => `${r.groupName}: ${r.error}`)
+            .join(" · ")
+        );
       }
       setPreview(null);
       setFile(null);
@@ -138,6 +176,8 @@ export default function CheckinCard(props: Props) {
       setBusy(false);
     }
   }
+
+  const multiGroup = props.groupOptions.length > 1;
 
   return (
     <div className="card hero">
@@ -170,9 +210,32 @@ export default function CheckinCard(props: Props) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={preview} alt="인증 사진 미리보기" />
               </div>
+              {multiGroup && (
+                <div className="group-select">
+                  <p className="goal" style={{ margin: "0 0 6px" }}>
+                    이 사진으로 인증할 그룹을 선택하세요
+                  </p>
+                  {props.groupOptions.map((g) => (
+                    <label key={g.groupId} className={`group-check ${g.alreadyChecked ? "off" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(g.groupId)}
+                        disabled={g.alreadyChecked || busy}
+                        onChange={() => toggleGroup(g.groupId)}
+                      />
+                      {g.groupName}
+                      {g.alreadyChecked && " (인증 완료)"}
+                    </label>
+                  ))}
+                </div>
+              )}
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 <button className="btn cta" onClick={submit} disabled={busy}>
-                  {busy ? "도장 찍는 중…" : "이 사진으로 출근 도장 쿵! 🔨"}
+                  {busy
+                    ? "도장 찍는 중…"
+                    : multiGroup
+                      ? `${selected.length}개 그룹에 도장 쿵! 🔨`
+                      : "이 사진으로 출근 도장 쿵! 🔨"}
                 </button>
                 <button
                   className="btn sub"
@@ -208,6 +271,7 @@ export default function CheckinCard(props: Props) {
       )}
 
       {error && <div className="error-msg">{error}</div>}
+      {notice && <div className="ok-msg">{notice}</div>}
 
       {showCamera && (
         <div className="cam-overlay" role="dialog" aria-label="카메라">

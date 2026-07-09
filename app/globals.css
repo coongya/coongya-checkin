@@ -575,8 +575,12 @@ label.field select:focus {
 }
 .cal .cell.excused {
   background: var(--blue-tint);
+  border: 1.5px solid var(--blue-ink);
   color: var(--blue-ink);
   font-weight: 700;
+}
+.cal .cell.excused .dnum {
+  color: var(--blue-ink);
 }
 .cal .cell.absent {
   background: var(--red);
@@ -674,6 +678,33 @@ label.field select:focus {
   max-height: 300px;
   border-radius: 14px;
   border: 2px solid rgba(255, 255, 255, 0.6);
+}
+
+/* 멀티 그룹 선택 (히어로 카드 안) */
+.group-select {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  text-align: left;
+}
+.group-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+.group-check.off {
+  opacity: 0.55;
+}
+.group-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: #fff;
 }
 
 /* 카메라 오버레이 (무음 촬영) */

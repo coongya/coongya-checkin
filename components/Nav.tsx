@@ -14,13 +14,22 @@ export function TopBar({ groupName }: { groupName: string }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <Link href="/dashboard" className="brand">
-          <span className="mascot">
-            <KungyaFace avatar="onion" size={26} />
-          </span>
-          쿵야출근단
-          <span className="grp">· {groupName}</span>
-        </Link>
+        <div className="brand">
+          <Link
+            href="/dashboard"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+          >
+            <span className="mascot">
+              <KungyaFace avatar="onion" size={26} />
+            </span>
+            쿵야출근단
+          </Link>
+          {groupName && (
+            <Link href="/groups" className="grp" title="그룹 전환">
+              · {groupName} ▾
+            </Link>
+          )}
+        </div>
         <button className="btn small plain" onClick={logout}>
           로그아웃
         </button>
@@ -29,21 +38,24 @@ export function TopBar({ groupName }: { groupName: string }) {
   );
 }
 
-export function TabBar() {
+export function TabBar({ hasGroup = true }: { hasGroup?: boolean }) {
   const path = usePathname();
   const tabs = [
-    { href: "/dashboard", label: "오늘", ico: "🏠" },
-    { href: "/stats", label: "통계", ico: "📊" },
-    { href: "/settings", label: "설정", ico: "⚙️" },
+    { href: "/dashboard", label: "오늘", ico: "🏠", needsGroup: true },
+    { href: "/stats", label: "통계", ico: "📊", needsGroup: true },
+    { href: "/groups", label: "그룹", ico: "👥", needsGroup: false },
+    { href: "/settings", label: "설정", ico: "⚙️", needsGroup: true },
   ];
   return (
     <nav className="tabbar">
-      {tabs.map((t) => (
-        <Link key={t.href} href={t.href} className={path?.startsWith(t.href) ? "active" : ""}>
-          <span className="ico">{t.ico}</span>
-          {t.label}
-        </Link>
-      ))}
+      {tabs
+        .filter((t) => hasGroup || !t.needsGroup)
+        .map((t) => (
+          <Link key={t.href} href={t.href} className={path?.startsWith(t.href) ? "active" : ""}>
+            <span className="ico">{t.ico}</span>
+            {t.label}
+          </Link>
+        ))}
     </nav>
   );
 }

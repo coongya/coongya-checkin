@@ -2,11 +2,12 @@ import { createHmac, scryptSync, randomBytes, timingSafeEqual } from "node:crypt
 import { cookies } from "next/headers";
 
 const COOKIE = "kungya_session";
+const GROUP_COOKIE = "kungya_group"; // 현재 보고 있는 그룹
 
 function secret(): string {
   const s = process.env.SESSION_SECRET;
   if (s) return s;
-  // 프로덕션에서 시크릿 없이 배포되면 세션 위조가 가능하므로 기동을 막는다
+  // 프로덕션에서 시크릿 없이 배포되면 세션 위조가 가능해지므로 기동을 막는다
   if (process.env.NODE_ENV === "production") {
     throw new Error("SESSION_SECRET 환경변수가 설정되지 않았어요. 배포 환경에 반드시 추가하세요.");
   }
@@ -14,8 +15,7 @@ function secret(): string {
 }
 
 export interface Session {
-  memberId: string;
-  groupId: string;
+  userId: string;
 }
 
 function sign(payload: string): string {
@@ -37,7 +37,7 @@ export function decodeSession(token: string | undefined): Session | null {
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
     const s = JSON.parse(Buffer.from(payload, "base64url").toString());
-    if (typeof s.memberId === "string" && typeof s.groupId === "string") return s;
+    if (typeof s.userId === "string") return { userId: s.userId };
     return null;
   } catch {
     return null;
@@ -63,6 +63,24 @@ export async function setSession(s: Session) {
 export async function clearSession() {
   const store = await cookies();
   store.delete(COOKIE);
+  store.delete(GROUP_COOKIE);
+}
+
+// 현재 선택된 그룹 (계정은 여러 그룹에 참여할 수 있음)
+export async function getCurrentGroupId(): Promise<string | null> {
+  const store = await cookies();
+  return store.get(GROUP_COOKIE)?.value ?? null;
+}
+
+export async function setCurrentGroupId(groupId: string) {
+  const store = await cookies();
+  store.set(GROUP_COOKIE, groupId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+  });
 }
 
 // PIN 해싱 (scrypt + salt)

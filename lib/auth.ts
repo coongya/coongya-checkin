@@ -1,21 +1,29 @@
 import { db } from "./db";
-import { getSession } from "./session";
-import type { Group, Member } from "./types";
+import { getSession, getCurrentGroupId } from "./session";
+import type { Group, User, Member } from "./types";
 
 export interface Authed {
-  member: Member;
-  group: Group;
+  user: User;
+  /** 참여 중인 모든 그룹 */
+  memberships: { member: Member; group: Group }[];
+  /** 현재 선택된 그룹 컨텍스트 (참여 그룹이 없으면 null) */
+  current: { member: Member; group: Group } | null;
 }
 
 export async function getAuthed(): Promise<Authed | null> {
   const session = await getSession();
   if (!session) return null;
   const d = await db();
-  const member = await d.getMember(session.memberId);
-  if (!member) return null;
-  const group = await d.getGroup(member.group_id);
-  if (!group) return null;
-  return { member, group };
+  const user = await d.getUser(session.userId);
+  if (!user) return null;
+  const memberships = await d.listMembershipsByUser(user.id);
+
+  let current: Authed["current"] = null;
+  if (memberships.length > 0) {
+    const wanted = await getCurrentGroupId();
+    current = memberships.find((m) => m.group.id === wanted) ?? memberships[0];
+  }
+  return { user, memberships, current };
 }
 
 export function generateInviteCode(): string {

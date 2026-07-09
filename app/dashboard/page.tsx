@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 export default async function Dashboard() {
   const auth = await getAuthed();
   if (!auth) redirect("/");
-  const { member, group } = auth;
+  if (!auth.current) redirect("/groups");
+  const { member, group } = auth.current;
 
   const d = await db();
   const kst = kstParts();
@@ -27,6 +28,15 @@ export default async function Dashboard() {
 
   const myCheckin = checkins.find((c) => c.member_id === member.id);
   const myAbsence = absences.find((a) => a.member_id === member.id);
+
+  // 멀티 그룹 인증: 내 모든 멤버십의 오늘 인증 여부
+  const myMembershipIds = auth.memberships.map((m) => m.member.id);
+  const myCheckinsToday = await d.listCheckins(myMembershipIds, today, today);
+  const groupOptions = auth.memberships.map(({ member: mm, group: gg }) => ({
+    groupId: gg.id,
+    groupName: gg.name,
+    alreadyChecked: myCheckinsToday.some((c) => c.member_id === mm.id),
+  }));
 
   const rows = members.map((m) => {
     const c = checkins.find((x) => x.member_id === m.id);
@@ -58,7 +68,7 @@ export default async function Dashboard() {
       <TopBar groupName={group.name} />
       <main className="container">
         <CheckinCard
-          avatar={member.avatar}
+          avatar={auth.user.avatar}
           scheduledTime={effectiveTime(member)}
           alreadyChecked={!!myCheckin}
           checkedTime={myCheckin ? fmtTimeKST(myCheckin.checked_at) : undefined}
@@ -66,6 +76,8 @@ export default async function Dashboard() {
           lateMinutes={myCheckin?.late_minutes}
           isWorkdayToday={isWorkday(today, member.workdays)}
           hasAbsenceToday={!!myAbsence}
+          currentGroupId={group.id}
+          groupOptions={groupOptions}
         />
 
         <div className="card">

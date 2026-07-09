@@ -8,16 +8,27 @@ export interface Group {
   created_at: string;
 }
 
-export interface Member {
+// 계정 — 앱 전체에서 하나, 여러 그룹에 참여 가능
+export interface User {
   id: string;
-  group_id: string;
-  name: string;
+  username: string;
   pin_hash: string;
-  scheduled_time: string; // "HH:MM"
-  workdays: string; // ISO weekdays, e.g. "12345" (월~금)
   avatar: string;
-  is_admin: boolean;
   created_at: string;
+}
+
+// 멤버십 뷰 — memberships 행 + 계정의 이름/아바타를 합친 형태.
+// 통계·화면 코드는 이 타입 하나로 동작한다. id는 membership id.
+export interface Member {
+  id: string; // membership id
+  user_id: string;
+  group_id: string;
+  name: string; // users.username
+  avatar: string; // users.avatar
+  scheduled_time: string; // 이 그룹에서의 기준 시각 "HH:MM"
+  workdays: string; // ISO weekdays, e.g. "12345" (월~금)
+  is_admin: boolean;
+  created_at: string; // 그룹 참여일
 }
 
 export interface Checkin {

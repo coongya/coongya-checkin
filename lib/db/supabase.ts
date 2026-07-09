@@ -1,8 +1,10 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Group, Member, Checkin, Absence, ScheduleOverride } from "../types";
-import type { DB, NewGroup, NewMember, NewCheckin } from "./index";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
+import type { DB, NewGroup, NewUser, NewMembership, NewCheckin } from "./index";
 
 const BUCKET = "checkin-photos";
+// memberships + users 조인 셀렉트 — Member 뷰를 만들기 위함
+const MEMBER_SELECT = "*, users(username, avatar)";
 
 function client(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -14,9 +16,55 @@ function fail(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
 
+interface MembershipJoined {
+  id: string;
+  user_id: string;
+  group_id: string;
+  scheduled_time: string;
+  workdays: string;
+  is_admin: boolean;
+  created_at: string;
+  users: { username: string; avatar: string } | null;
+}
+
+function toMember(row: MembershipJoined): Member {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    group_id: row.group_id,
+    name: row.users?.username ?? "?",
+    avatar: row.users?.avatar ?? "onion",
+    scheduled_time: row.scheduled_time,
+    workdays: row.workdays,
+    is_admin: row.is_admin,
+    created_at: row.created_at,
+  };
+}
+
 export function supabaseDb(): DB {
   const sb = client();
   return {
+    async createUser(nu: NewUser) {
+      const { data, error } = await sb.from("users").insert(nu).select().single();
+      if (error) {
+        if (error.code === "23505") throw new Error("duplicate_username");
+        throw new Error(error.message);
+      }
+      return data as User;
+    },
+    async getUser(id) {
+      const { data } = await sb.from("users").select().eq("id", id).maybeSingle();
+      return (data as User) ?? null;
+    },
+    async getUserByUsername(username) {
+      const { data } = await sb.from("users").select().eq("username", username).maybeSingle();
+      return (data as User) ?? null;
+    },
+    async updateUser(id, patch) {
+      const { error } = await sb.from("users").update(patch).eq("id", id);
+      fail(error);
+    },
+
     async createGroup(ng: NewGroup) {
       const { data, error } = await sb.from("groups").insert(ng).select().single();
       fail(error);
@@ -39,38 +87,57 @@ export function supabaseDb(): DB {
       fail(error);
     },
 
-    async createMember(nm: NewMember) {
-      const { data, error } = await sb.from("members").insert(nm).select().single();
+    async createMembership(nm: NewMembership) {
+      const { data, error } = await sb
+        .from("memberships")
+        .insert(nm)
+        .select(MEMBER_SELECT)
+        .single();
       if (error) {
-        if (error.code === "23505") throw new Error("duplicate_name");
+        if (error.code === "23505") throw new Error("duplicate_membership");
         throw new Error(error.message);
       }
-      return data as Member;
+      return toMember(data as MembershipJoined);
     },
-    async getMember(id) {
-      const { data } = await sb.from("members").select().eq("id", id).maybeSingle();
-      return (data as Member) ?? null;
-    },
-    async getMemberByName(groupId, name) {
+    async getMembership(id) {
       const { data } = await sb
-        .from("members")
-        .select()
-        .eq("group_id", groupId)
-        .eq("name", name)
+        .from("memberships")
+        .select(MEMBER_SELECT)
+        .eq("id", id)
         .maybeSingle();
-      return (data as Member) ?? null;
+      return data ? toMember(data as MembershipJoined) : null;
+    },
+    async getMembershipByUserAndGroup(userId, groupId) {
+      const { data } = await sb
+        .from("memberships")
+        .select(MEMBER_SELECT)
+        .eq("user_id", userId)
+        .eq("group_id", groupId)
+        .maybeSingle();
+      return data ? toMember(data as MembershipJoined) : null;
+    },
+    async listMembershipsByUser(userId) {
+      const { data, error } = await sb
+        .from("memberships")
+        .select("*, users(username, avatar), groups(*)")
+        .eq("user_id", userId)
+        .order("created_at");
+      fail(error);
+      return ((data ?? []) as (MembershipJoined & { groups: Group })[])
+        .filter((row) => row.groups)
+        .map((row) => ({ member: toMember(row), group: row.groups }));
     },
     async listMembers(groupId) {
       const { data, error } = await sb
-        .from("members")
-        .select()
+        .from("memberships")
+        .select(MEMBER_SELECT)
         .eq("group_id", groupId)
         .order("created_at");
       fail(error);
-      return (data as Member[]) ?? [];
+      return ((data ?? []) as MembershipJoined[]).map(toMember);
     },
-    async updateMember(id, patch) {
-      const { error } = await sb.from("members").update(patch).eq("id", id);
+    async updateMembership(id, patch) {
+      const { error } = await sb.from("memberships").update(patch).eq("id", id);
       fail(error);
     },
 
@@ -196,7 +263,10 @@ export function supabaseDb(): DB {
       };
     },
     async purgeOldPhotos(groupId, beforeDate) {
-      const { data: members } = await sb.from("members").select("id").eq("group_id", groupId);
+      const { data: members } = await sb
+        .from("memberships")
+        .select("id")
+        .eq("group_id", groupId);
       const ids = (members ?? []).map((m: { id: string }) => m.id);
       if (ids.length === 0) return 0;
       // 한 번에 최대 200건씩 정리 (체크인마다 호출되므로 점진적으로 비워짐)

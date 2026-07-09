@@ -1,11 +1,22 @@
 // 로컬 개발/테스트용 인메모리 DB (MOCK_DB=1). 서버 재시작 시 초기화됩니다.
 import { randomUUID } from "node:crypto";
-import type { Group, Member, Checkin, Absence, ScheduleOverride } from "../types";
-import type { DB, NewGroup, NewMember, NewCheckin } from "./index";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
+import type { DB, NewGroup, NewUser, NewMembership, NewCheckin } from "./index";
+
+interface MembershipRow {
+  id: string;
+  user_id: string;
+  group_id: string;
+  scheduled_time: string;
+  workdays: string;
+  is_admin: boolean;
+  created_at: string;
+}
 
 interface Store {
+  users: User[];
   groups: Group[];
-  members: Member[];
+  memberships: MembershipRow[];
   checkins: Checkin[];
   absences: Absence[];
   overrides: ScheduleOverride[];
@@ -16,14 +27,59 @@ const g = globalThis as unknown as { __kungyaStore?: Store };
 
 function store(): Store {
   if (!g.__kungyaStore) {
-    g.__kungyaStore = { groups: [], members: [], checkins: [], absences: [], overrides: [], photos: new Map() };
+    g.__kungyaStore = {
+      users: [],
+      groups: [],
+      memberships: [],
+      checkins: [],
+      absences: [],
+      overrides: [],
+      photos: new Map(),
+    };
   }
   return g.__kungyaStore;
 }
 
+function toMember(row: MembershipRow): Member {
+  const user = store().users.find((u) => u.id === row.user_id);
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    group_id: row.group_id,
+    name: user?.username ?? "?",
+    avatar: user?.avatar ?? "onion",
+    scheduled_time: row.scheduled_time,
+    workdays: row.workdays,
+    is_admin: row.is_admin,
+    created_at: row.created_at,
+  };
+}
+
 export function memoryDb(): DB {
   return {
+    async createUser(nu: NewUser) {
+      if (store().users.some((u) => u.username === nu.username)) {
+        throw new Error("duplicate_username");
+      }
+      const u: User = { id: randomUUID(), created_at: new Date().toISOString(), ...nu };
+      store().users.push(u);
+      return u;
+    },
+    async getUser(id) {
+      return store().users.find((u) => u.id === id) ?? null;
+    },
+    async getUserByUsername(username) {
+      return store().users.find((u) => u.username === username) ?? null;
+    },
+    async updateUser(id, patch) {
+      const u = store().users.find((x) => x.id === id);
+      if (u) Object.assign(u, patch);
+    },
+
     async createGroup(ng: NewGroup) {
+      if (store().groups.some((x) => x.invite_code === ng.invite_code)) {
+        throw new Error("duplicate_invite_code");
+      }
       const grp: Group = {
         id: randomUUID(),
         timezone: "Asia/Seoul",
@@ -44,25 +100,48 @@ export function memoryDb(): DB {
       if (grp) Object.assign(grp, patch);
     },
 
-    async createMember(nm: NewMember) {
-      if (store().members.some((m) => m.group_id === nm.group_id && m.name === nm.name)) {
-        throw new Error("duplicate_name");
+    async createMembership(nm: NewMembership) {
+      if (
+        store().memberships.some(
+          (m) => m.user_id === nm.user_id && m.group_id === nm.group_id
+        )
+      ) {
+        throw new Error("duplicate_membership");
       }
-      const m: Member = { id: randomUUID(), created_at: new Date().toISOString(), ...nm };
-      store().members.push(m);
-      return m;
+      const row: MembershipRow = {
+        id: randomUUID(),
+        created_at: new Date().toISOString(),
+        ...nm,
+      };
+      store().memberships.push(row);
+      return toMember(row);
     },
-    async getMember(id) {
-      return store().members.find((x) => x.id === id) ?? null;
+    async getMembership(id) {
+      const row = store().memberships.find((m) => m.id === id);
+      return row ? toMember(row) : null;
     },
-    async getMemberByName(groupId, name) {
-      return store().members.find((x) => x.group_id === groupId && x.name === name) ?? null;
+    async getMembershipByUserAndGroup(userId, groupId) {
+      const row = store().memberships.find(
+        (m) => m.user_id === userId && m.group_id === groupId
+      );
+      return row ? toMember(row) : null;
+    },
+    async listMembershipsByUser(userId) {
+      return store()
+        .memberships.filter((m) => m.user_id === userId)
+        .map((row) => ({
+          member: toMember(row),
+          group: store().groups.find((gr) => gr.id === row.group_id)!,
+        }))
+        .filter((x) => x.group);
     },
     async listMembers(groupId) {
-      return store().members.filter((x) => x.group_id === groupId);
+      return store()
+        .memberships.filter((m) => m.group_id === groupId)
+        .map(toMember);
     },
-    async updateMember(id, patch) {
-      const m = store().members.find((x) => x.id === id);
+    async updateMembership(id, patch) {
+      const m = store().memberships.find((x) => x.id === id);
       if (m) Object.assign(m, patch);
     },
 
@@ -160,7 +239,7 @@ export function memoryDb(): DB {
     async purgeOldPhotos(groupId, beforeDate) {
       const s = store();
       const memberIds = new Set(
-        s.members.filter((m) => m.group_id === groupId).map((m) => m.id)
+        s.memberships.filter((m) => m.group_id === groupId).map((m) => m.id)
       );
       let count = 0;
       for (const c of s.checkins) {
