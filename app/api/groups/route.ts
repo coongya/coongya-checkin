@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
         fine_late: 10000,
         fine_absent: 10000,
       });
-    } catch {
+    } catch (e) {
+      console.error("[groups] 그룹 생성 실패:", e instanceof Error ? e.message : e);
       group = null;
     }
   }

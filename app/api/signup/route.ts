@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+    // Vercel 로그(Observability)에서 실패 원인을 볼 수 있도록 남긴다
+    console.error("[signup] 가입 실패:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "가입에 실패했어요." }, { status: 500 });
   }
 }

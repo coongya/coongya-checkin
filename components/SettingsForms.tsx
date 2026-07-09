@@ -369,6 +369,8 @@ export function GroupSettings(props: {
   fineAbsent: number;
   inviteCode: string;
   groupName: string;
+  /** 관리자가 PIN 재설정 코드를 발급할 수 있는 대상 (본인 제외 멤버) */
+  resetTargets: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [name, setName] = useState(props.groupName);
@@ -376,6 +378,7 @@ export function GroupSettings(props: {
   const [fineAbsent, setFineAbsent] = useState(String(props.fineAbsent));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resetCodes, setResetCodes] = useState<Record<string, string>>({});
 
   async function save() {
     if (!name.trim()) {
@@ -405,6 +408,29 @@ export function GroupSettings(props: {
     else {
       router.push("/groups");
       router.refresh();
+    }
+  }
+
+  async function issueResetCode(memberId: string, memberName: string) {
+    const sure = confirm(
+      `${memberName}의 PIN 재설정 임시 코드를 발급할까요?\n\n코드는 30분간 유효하고, 본인에게 직접 전달해 주세요.`
+    );
+    if (!sure) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin-reset-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId }),
+      });
+      const data = await res.json();
+      if (!res.ok) setMsg({ ok: false, text: data.error || "발급에 실패했어요." });
+      else setResetCodes((prev) => ({ ...prev, [memberId]: data.code }));
+    } catch {
+      setMsg({ ok: false, text: "네트워크 오류가 발생했어요." });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -463,6 +489,37 @@ export function GroupSettings(props: {
           <button className="btn" onClick={save} disabled={busy}>
             저장하기
           </button>
+
+          {props.resetTargets.length > 0 && (
+            <>
+              <hr className="divider" />
+              <h3>멤버 PIN 재설정 🔑</h3>
+              <p className="muted" style={{ marginTop: 0 }}>
+                PIN을 잊은 멤버에게 임시 코드(30분 유효)를 발급해 전달하세요. 멤버는
+                로그인 화면의 &quot;PIN을 잊으셨나요?&quot;에서 코드로 새 PIN을 만들 수
+                있어요.
+              </p>
+              {props.resetTargets.map((t) => (
+                <div className="member-row" key={t.id}>
+                  <div className="who">
+                    <div className="nm">{t.name}</div>
+                    {resetCodes[t.id] && (
+                      <div className="sub">
+                        임시 코드: <b style={{ fontSize: 16, letterSpacing: "0.15em" }}>{resetCodes[t.id]}</b>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="btn small ghost"
+                    onClick={() => issueResetCode(t.id, t.name)}
+                    disabled={busy}
+                  >
+                    {resetCodes[t.id] ? "재발급" : "코드 발급"}
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
         </>
       ) : (
         <>

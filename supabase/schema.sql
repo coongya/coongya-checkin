@@ -15,7 +15,6 @@
 -- alter table memberships drop constraint if exists memberships_user_id_group_id_key;
 -- create unique index if not exists idx_memberships_active_unique
 --   on memberships(user_id, group_id) where (left_at is null);
--- drop table if exists pin_resets; -- (이메일 인증 방식을 쓰던 중간 버전에서 업그레이드하는 경우)
 
 -- 계정: 앱 전체에서 하나. 이메일이 전역 유니크(로그인 ID), 닉네임은 중복 허용.
 create table if not exists users (
@@ -83,6 +82,15 @@ create table if not exists schedule_overrides (
   scheduled_time text not null, -- HH:MM
   created_at timestamptz not null default now(),
   unique (member_id, work_date)
+);
+
+-- PIN 재설정 임시 코드 — 그룹 관리자가 발급한 6자리 코드의 해시 (유저당 1개, 1회용)
+create table if not exists pin_resets (
+  user_id uuid primary key references users(id) on delete cascade,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  attempts int not null default 0,
+  created_at timestamptz not null default now()
 );
 
 create index if not exists idx_memberships_user on memberships(user_id);

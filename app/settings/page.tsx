@@ -34,6 +34,12 @@ export default async function Settings() {
   const overrides = (await d.listOverrides([member.id], today, to)).sort((a, b) =>
     a.work_date.localeCompare(b.work_date)
   );
+  // 관리자용 PIN 재설정 대상 — 본인 제외한 활동 중 멤버
+  const resetTargets = member.is_admin
+    ? (await d.listMembers(group.id))
+        .filter((m) => m.user_id !== auth.user.id)
+        .map((m) => ({ id: m.id, name: m.name }))
+    : [];
 
   return (
     <>
@@ -58,6 +64,7 @@ export default async function Settings() {
           fineAbsent={group.fine_absent}
           inviteCode={group.invite_code}
           groupName={group.name}
+          resetTargets={resetTargets}
         />
         <p className="muted" style={{ textAlign: "center" }}>
           오늘 날짜(KST): {today} · 시각 판정은 서버 기준이에요

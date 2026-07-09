@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof Error && e.message === "duplicate_membership") {
       return NextResponse.json({ error: "이미 참여 중인 그룹이에요." }, { status: 409 });
     }
+    console.error("[join] 그룹 참여 실패:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "참여에 실패했어요." }, { status: 500 });
   }
 }
