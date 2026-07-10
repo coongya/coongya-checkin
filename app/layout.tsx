@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "쿵야출근단",
   description: "사진 한 장으로 출근 도장 쿵! 지각 벌금과 출근 통계를 함께 기록해요.",
+  // iOS 홈 화면 추가 시 앱처럼 열리고, 시작 화면이 항상 홈(/)이 되게 한다
+  appleWebApp: { capable: true, title: "쿵야출근단", statusBarStyle: "default" },
+  icons: { apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

@@ -688,23 +688,46 @@ label.field select:focus {
   margin: 10px 0;
   text-align: left;
 }
+/* 그룹 선택 칩 — 체크 안 됨: 회색, 체크됨: 초록색으로 명확하게 구분 */
 .group-check {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
+  gap: 10px;
+  padding: 11px 14px;
+  margin: 6px 0;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
+  border-radius: 12px;
+  background: #eef1f5; /* 미선택: 회색 */
+  color: #8a93a0;
+  border: 2px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.group-check:has(input:checked) {
+  background: #fff; /* 선택: 초록색 강조 */
+  color: var(--green-dark);
+  border-color: #0ab27a;
+}
+.group-check:has(input:checked)::after {
+  content: "✓ 인증";
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: #0ab27a;
+  border-radius: 999px;
+  padding: 3px 9px;
 }
 .group-check.off {
   opacity: 0.55;
+  cursor: default;
 }
 .group-check input {
-  width: 18px;
-  height: 18px;
-  accent-color: #fff;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: #0ab27a;
 }
 
 /* 카메라 오버레이 (무음 촬영) */
