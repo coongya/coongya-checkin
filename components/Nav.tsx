@@ -53,13 +53,13 @@ export function TopBar({ groupName }: { groupName: string }) {
           {open && (
             <div className="menu-drop" role="menu">
               <Link href="/account" role="menuitem" onClick={() => setOpen(false)}>
-                👤 내 정보 수정
+                내 정보 수정
               </Link>
               <Link href="/groups" role="menuitem" onClick={() => setOpen(false)}>
-                👥 그룹 관리
+                그룹 관리
               </Link>
               <button role="menuitem" onClick={logout}>
-                🚪 로그아웃
+                로그아웃
               </button>
             </div>
           )}

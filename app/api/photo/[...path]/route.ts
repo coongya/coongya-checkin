@@ -22,16 +22,11 @@ export async function GET(
   const ownerUserId = parts[1];
 
   const d = await db();
-  let photo: Awaited<ReturnType<typeof d.getPhoto>>;
-  if (ownerUserId === session.userId) {
-    // 본인 사진 — 바로 다운로드
-    photo = await d.getPhoto(key);
-  } else {
-    // 사진 주인과 공유하는 그룹이 있는지 확인하면서 다운로드도 병렬로 시작
-    const [myMemberships, ownerMemberships, downloaded] = await Promise.all([
+  // 접근 검증 — 본인이 아니면 사진 주인과 공유하는 그룹이 있는지 확인
+  if (ownerUserId !== session.userId) {
+    const [myMemberships, ownerMemberships] = await Promise.all([
       d.listMembershipsByUser(session.userId),
       d.listMembershipsByUser(ownerUserId),
-      d.getPhoto(key),
     ]);
     const myGroupIds = new Set(myMemberships.map((m) => m.group.id));
     const shared = ownerMemberships.some((m) => myGroupIds.has(m.group.id));
@@ -39,9 +34,20 @@ export async function GET(
       console.error(`[photo] 접근 거부(공유 그룹 없음): viewer=${session.userId} path=${key}`);
       return new NextResponse("Forbidden", { status: 403 });
     }
-    photo = downloaded;
   }
 
+  // Supabase Storage면 시간제한 서명 URL로 리다이렉트 — 브라우저가 CDN에서 직접
+  // 받아 함수를 통한 바이트 중계가 없어지고 훨씬 빠르다.
+  const signed = await d.getPhotoSignedUrl(key);
+  if (signed) {
+    return NextResponse.redirect(signed, {
+      status: 302,
+      headers: { "Cache-Control": "private, max-age=300" }, // 서명 유효(10분)보다 짧게
+    });
+  }
+
+  // 서명 URL 미지원(로컬 mock) — 기존처럼 직접 서빙
+  const photo = await d.getPhoto(key);
   if (!photo) {
     // Vercel 로그에서 원인 확인용 — Storage에 파일이 없거나 다운로드 실패
     console.error(`[photo] 파일을 찾을 수 없음: path=${key}`);

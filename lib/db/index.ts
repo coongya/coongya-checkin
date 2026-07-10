@@ -100,6 +100,8 @@ export interface DB {
   uploadPhoto(path: string, data: Buffer, contentType: string): Promise<void>;
   photoUrl(path: string): string;
   getPhoto(path: string): Promise<{ data: Buffer; contentType: string } | null>;
+  /** 브라우저가 Storage에서 직접 받을 수 있는 시간제한 서명 URL. 미지원(mock)이면 null */
+  getPhotoSignedUrl(path: string): Promise<string | null>;
   /** beforeDate 이전 출근 기록의 사진 파일만 삭제 (기록·통계는 보존). 삭제한 개수 반환 */
   purgeOldPhotos(groupId: string, beforeDate: string): Promise<number>;
 }

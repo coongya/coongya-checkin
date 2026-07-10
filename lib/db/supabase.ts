@@ -343,6 +343,14 @@ export function supabaseDb(): DB {
       // 비공개 버킷: 앱 API를 통해서만 서빙 (그룹 멤버 검증 후 접근)
       return `/api/photo/${path}`;
     },
+    async getPhotoSignedUrl(path) {
+      const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(path, 600);
+      if (error || !data?.signedUrl) {
+        if (error) console.error(`[photo] 서명 URL 발급 실패: ${path} — ${error.message}`);
+        return null;
+      }
+      return data.signedUrl;
+    },
     async getPhoto(path) {
       const { data, error } = await sb.storage.from(BUCKET).download(path);
       if (error || !data) {

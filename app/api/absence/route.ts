@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { getAuthed } from "@/lib/auth";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const REASONS = ["휴가", "재택", "교육", "아파요", "출장"];
+// 재택은 집에서도 출근 인증이 가능하므로 휴가 사유에서 제외
+const REASONS = ["휴가", "교육", "아파요", "출장"];
 
 // 현재 그룹에 휴가/미출근 사유 등록
 export async function POST(req: NextRequest) {

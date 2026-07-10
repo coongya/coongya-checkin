@@ -197,7 +197,6 @@ export function AbsenceManager({ absences }: { absences: Absence[] }) {
         사유
         <select value={reason} onChange={(e) => setReason(e.target.value)}>
           <option>휴가</option>
-          <option>재택</option>
           <option>교육</option>
           <option>아파요</option>
           <option>출장</option>

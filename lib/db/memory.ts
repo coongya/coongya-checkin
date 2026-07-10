@@ -290,6 +290,9 @@ export function memoryDb(): DB {
     async getPhoto(path) {
       return store().photos.get(path) ?? null;
     },
+    async getPhotoSignedUrl() {
+      return null; // 인메모리 DB는 프록시로 직접 서빙
+    },
     async purgeOldPhotos(groupId, beforeDate) {
       const s = store();
       const memberIds = new Set(
