@@ -6,16 +6,19 @@
 멤버별 기준 시각으로 **지각을 판정**해 **벌금과 통계**를 기록합니다.
 
 <p align="center">
-  <img src="docs/screenshot-landing.png" width="240" alt="랜딩" />
-  <img src="docs/screenshot-dashboard.png" width="240" alt="대시보드" />
-  <img src="docs/screenshot-stats.png" width="240" alt="통계" />
+  <img src="docs/screenshot-landing.png" width="190" alt="랜딩" />
+  <img src="docs/screenshot-dashboard.png" width="190" alt="홈 — 출근 인증 + 내 그룹" />
+  <img src="docs/screenshot-today.png" width="190" alt="오늘 — 그룹 현황 · 인증샷" />
+  <img src="docs/screenshot-stats.png" width="190" alt="통계" />
 </p>
 
 ## 주요 기능
 
-- **오늘 화면**: 인증 카드(상태별 쿵야 이미지 + 인증 전 남은 시간 카운트다운) 아래에
+- **홈 화면**: 인증 카드(상태별 쿵야 이미지 + 인증 전 남은 시간 카운트다운) 아래에
   내 그룹 목록 — 사진 한 장으로 여러 그룹을 체크해 한 번에 인증. 그룹을 누르면
-  그 그룹의 오늘 현황(멤버별 상태·인증샷)으로 이동, ← 로 복귀
+  "오늘" 탭에서 그 그룹의 오늘 현황(멤버별 상태·인증샷)을 봄
+- **탭 구성**: 홈 · 오늘 · 통계 · 설정. 계정 설정(닉네임·캐릭터·PIN)과 그룹
+  관리(참여·만들기)는 오른쪽 위 ☰ 메뉴에서
 - **그룹(로그)**: 그룹 생성 시 6자리 초대코드 발급, 초대코드로 참여
   — 그룹 화면의 초대코드는 누르면 클립보드에 복사
 - **간편 로그인**: 이메일 + PIN(숫자 4~6자리), HMAC 서명 쿠키 세션
@@ -120,15 +123,21 @@ Supabase 단계를 진행한 뒤 값을 채워주세요.
 - **PIN 초기화 요청 처리**: 운영자 메일로 요청이 오면, 발신 주소가 가입 이메일과
   같은지 확인한 뒤 `supabase/reset-pin.sql`의 이메일만 바꿔 실행하고
   "PIN 0000으로 로그인 후 꼭 변경하세요"라고 답장하면 됩니다.
+- **속도**: 서버 함수 리전은 `vercel.json`의 `regions`(기본 icn1 = 서울)로
+  고정돼요 — Supabase 프로젝트 리전과 가깝게 맞추는 게 응답 속도에 가장 중요합니다.
+  무료 플랜은 한동안 요청이 없으면 콜드 스타트로 첫 화면이 1~3초 느릴 수 있어요.
 
 ## 프로젝트 구조
 
 ```
 app/
   api/            # REST API (그룹·참여·로그인·체크인·휴가·사진 프록시)
-  dashboard/      # 오늘 현황 + 출근 인증
+  dashboard/      # 홈 — 출근 인증 + 내 그룹 목록
+  today/          # 오늘 — 현재 그룹의 오늘 현황·인증샷
   stats/          # 월별 성적표 · 출근 달력 · 랭킹
-  settings/       # 내 설정 · 휴가 등록 · 그룹(벌금) 설정
+  settings/       # 그룹별 설정 (기준 시각·요일·휴가·벌금·나가기)
+  account/        # 내 정보 수정 (닉네임·캐릭터·PIN)
+  groups/         # 그룹 관리 (참여·만들기)
 components/       # UI 컴포넌트 (무음 카메라, 아바타 등)
 lib/
   db/             # DB 추상화 (supabase / 인메모리 mock)

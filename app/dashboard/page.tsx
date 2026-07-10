@@ -19,19 +19,29 @@ export default async function Dashboard() {
   const d = await db();
   const today = kstParts().date;
   const myIds = auth.memberships.map((m) => m.member.id);
-  const myCheckins = await d.listCheckins(myIds, today, today);
-  const myAbsences = await d.listAbsences(myIds, today, today);
-  const myOverrides = await d.listOverrides(myIds, today, today);
+  // 쿼리를 병렬로 실행해 응답 시간을 줄인다 (Supabase 왕복이 가장 큰 비용)
+  const [myCheckins, myAbsences, myOverrides, groupData] = await Promise.all([
+    d.listCheckins(myIds, today, today),
+    d.listAbsences(myIds, today, today),
+    d.listOverrides(myIds, today, today),
+    Promise.all(
+      auth.memberships.map(async ({ group }) => {
+        const members = await d.listMembers(group.id);
+        const checkins = await d.listCheckins(
+          members.map((m) => m.id),
+          today,
+          today
+        );
+        return { groupId: group.id, members, checkins };
+      })
+    ),
+  ]);
 
   // 그룹별 요약 (멤버 수·출근 수) + 나의 오늘 상태
   const groups: GroupListItem[] = [];
   for (const { member, group } of auth.memberships) {
-    const members = await d.listMembers(group.id);
-    const checkins = await d.listCheckins(
-      members.map((m) => m.id),
-      today,
-      today
-    );
+    const gd = groupData.find((g) => g.groupId === group.id)!;
+    const { members, checkins } = gd;
     const myCheckin = myCheckins.find((c) => c.member_id === member.id);
     const myAbsence = myAbsences.find((a) => a.member_id === member.id);
     const workday = isWorkday(today, member.workdays);

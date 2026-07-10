@@ -7,7 +7,6 @@ import {
   MemberSettings,
   AbsenceManager,
   OverrideManager,
-  PinChange,
   GroupSettings,
 } from "@/components/SettingsForms";
 
@@ -46,18 +45,15 @@ export default async function Settings() {
       <TopBar groupName={group.name} />
       <main className="container">
         <p className="muted" style={{ margin: "0 0 10px" }}>
-          기준 시각·근무 요일·휴가는 <b>{group.name}</b> 그룹에만 적용돼요. 닉네임·캐릭터·PIN은
-          계정 전체에 적용돼요.
+          이 화면의 설정은 <b>{group.name}</b> 그룹에만 적용돼요. 닉네임·캐릭터·PIN은
+          오른쪽 위 ☰ → 내 정보 수정에서 바꿀 수 있어요.
         </p>
         <MemberSettings
           scheduledTime={member.scheduled_time}
           workdays={member.workdays}
-          avatar={auth.user.avatar}
-          username={auth.user.username}
         />
         <AbsenceManager absences={absences} />
         <OverrideManager overrides={overrides} defaultTime={member.scheduled_time} />
-        <PinChange />
         <GroupSettings
           isAdmin={member.is_admin}
           fineLate={group.fine_late}

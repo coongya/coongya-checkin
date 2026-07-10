@@ -345,7 +345,10 @@ export function supabaseDb(): DB {
     },
     async getPhoto(path) {
       const { data, error } = await sb.storage.from(BUCKET).download(path);
-      if (error || !data) return null;
+      if (error || !data) {
+        if (error) console.error(`[photo] Storage 다운로드 실패: ${path} — ${error.message}`);
+        return null;
+      }
       return {
         data: Buffer.from(await data.arrayBuffer()),
         contentType: data.type || "image/jpeg",

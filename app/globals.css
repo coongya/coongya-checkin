@@ -828,3 +828,42 @@ label.field select:focus {
   color: var(--ink-soft);
   flex: none;
 }
+
+/* 상단바 햄버거 메뉴 */
+.menu-wrap {
+  position: relative;
+}
+.menu-drop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(25, 31, 40, 0.14);
+  min-width: 160px;
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+.menu-drop a,
+.menu-drop button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+.menu-drop a:hover,
+.menu-drop button:hover {
+  background: var(--bg);
+}

@@ -34,17 +34,11 @@ async function patchJson(url: string, method: string, body: unknown): Promise<st
   }
 }
 
-export function MemberSettings(props: {
-  scheduledTime: string;
-  workdays: string;
-  avatar: string;
-  username: string;
-}) {
+// 그룹별 설정 — 이 그룹에서의 기준 시각·근무 요일 (설정 탭)
+export function MemberSettings(props: { scheduledTime: string; workdays: string }) {
   const router = useRouter();
   const [time, setTime] = useState(props.scheduledTime);
   const [workdays, setWorkdays] = useState(props.workdays);
-  const [avatar, setAvatar] = useState(props.avatar);
-  const [username, setUsername] = useState(props.username);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -62,16 +56,10 @@ export function MemberSettings(props: {
       setMsg({ ok: false, text: "근무 요일을 하나 이상 선택해 주세요." });
       return;
     }
-    if (username.trim().length < 2) {
-      setMsg({ ok: false, text: "닉네임은 2~20자로 입력해 주세요." });
-      return;
-    }
     setBusy(true);
     const err = await patchJson("/api/member", "PATCH", {
       scheduledTime: time,
       workdays,
-      avatar,
-      username,
     });
     setBusy(false);
     setMsg(err ? { ok: false, text: err } : { ok: true, text: "저장했어요! 🎉" });
@@ -80,16 +68,7 @@ export function MemberSettings(props: {
 
   return (
     <div className="card">
-      <h2>내 설정 🧅</h2>
-      <label className="field">
-        닉네임 (2~20자 · 모든 그룹에 적용)
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="예: 클레어"
-          maxLength={20}
-        />
-      </label>
+      <h2>이 그룹에서의 내 설정 🧅</h2>
       <label className="field">
         기준 출근 시각
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
@@ -110,6 +89,46 @@ export function MemberSettings(props: {
           </button>
         ))}
       </div>
+      {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}
+      <button className="btn" onClick={save} disabled={busy}>
+        저장하기
+      </button>
+    </div>
+  );
+}
+
+// 계정 설정 — 닉네임·캐릭터 (내 정보 수정 화면, 모든 그룹에 적용)
+export function AccountSettings(props: { username: string; avatar: string }) {
+  const router = useRouter();
+  const [username, setUsername] = useState(props.username);
+  const [avatar, setAvatar] = useState(props.avatar);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (username.trim().length < 2) {
+      setMsg({ ok: false, text: "닉네임은 2~20자로 입력해 주세요." });
+      return;
+    }
+    setBusy(true);
+    const err = await patchJson("/api/member", "PATCH", { username, avatar });
+    setBusy(false);
+    setMsg(err ? { ok: false, text: err } : { ok: true, text: "저장했어요! 🎉" });
+    if (!err) router.refresh();
+  }
+
+  return (
+    <div className="card">
+      <h2>프로필 👤</h2>
+      <label className="field">
+        닉네임 (2~20자)
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="예: 클레어"
+          maxLength={20}
+        />
+      </label>
       <span className="field" style={{ marginBottom: 4 }}>
         쿵야 캐릭터
       </span>

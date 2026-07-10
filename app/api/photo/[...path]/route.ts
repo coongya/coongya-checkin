@@ -26,12 +26,19 @@ export async function GET(
     const ownerMemberships = await d.listMembershipsByUser(ownerUserId);
     const myGroupIds = new Set(auth.memberships.map((m) => m.group.id));
     const shared = ownerMemberships.some((m) => myGroupIds.has(m.group.id));
-    if (!shared) return new NextResponse("Forbidden", { status: 403 });
+    if (!shared) {
+      console.error(`[photo] 접근 거부(공유 그룹 없음): viewer=${auth.user.id} path=${key}`);
+      return new NextResponse("Forbidden", { status: 403 });
+    }
   }
 
   const d = await db();
   const photo = await d.getPhoto(key);
-  if (!photo) return new NextResponse("Not found", { status: 404 });
+  if (!photo) {
+    // Vercel 로그에서 원인 확인용 — Storage에 파일이 없거나 다운로드 실패
+    console.error(`[photo] 파일을 찾을 수 없음: path=${key}`);
+    return new NextResponse("Not found", { status: 404 });
+  }
   return new NextResponse(new Uint8Array(photo.data), {
     headers: { "Content-Type": photo.contentType, "Cache-Control": "private, max-age=3600" },
   });

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -10,27 +9,22 @@ import InviteCode from "@/components/InviteCode";
 
 export const dynamic = "force-dynamic";
 
-// 그룹의 오늘 인증 현황 — 오늘 화면에서 그룹을 누르면 들어온다. ← 로 복귀.
-export default async function GroupToday({
-  params,
-}: {
-  params: Promise<{ groupId: string }>;
-}) {
+// "오늘" 탭 — 현재 선택된 그룹의 오늘 인증 현황 (홈에서 그룹을 누르면 여기로 온다)
+export default async function Today() {
   const auth = await getAuthed();
   if (!auth) redirect("/");
-
-  const { groupId } = await params;
-  const mine = auth.memberships.find((m) => m.group.id === groupId);
-  if (!mine) redirect("/dashboard"); // 참여하지 않은 그룹
-  const { member, group } = mine;
+  if (!auth.current) redirect("/groups");
+  const { member, group } = auth.current;
 
   const d = await db();
   const today = kstParts().date;
   const members = await d.listMembers(group.id);
   const ids = members.map((m) => m.id);
-  const checkins = await d.listCheckins(ids, today, today);
-  const absences = await d.listAbsences(ids, today, today);
-  const overrides = await d.listOverrides(ids, today, today);
+  const [checkins, absences, overrides] = await Promise.all([
+    d.listCheckins(ids, today, today),
+    d.listAbsences(ids, today, today),
+    d.listOverrides(ids, today, today),
+  ]);
   const effectiveTime = (m: (typeof members)[number]) =>
     overrides.find((o) => o.member_id === m.id)?.scheduled_time ?? m.scheduled_time;
 
@@ -61,18 +55,8 @@ export default async function GroupToday({
 
   return (
     <>
-      <TopBar groupName="" />
+      <TopBar groupName={group.name} />
       <main className="container">
-        <div className="backrow">
-          <Link href="/dashboard" className="back-btn" aria-label="오늘 화면으로">
-            ←
-          </Link>
-          <h1>
-            {group.name}
-            {member.is_admin && " 👑"}
-          </h1>
-        </div>
-
         <div className="card">
           <h2>오늘의 쿵야들 ({rows.filter((r) => r.c).length}/{rows.length} 출근)</h2>
           {rows.map(({ m, c, badge }) => (

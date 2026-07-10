@@ -13,8 +13,8 @@ export interface GroupListItem {
   myBadge: { cls: string; label: string };
 }
 
-// 오늘 화면의 내 그룹 목록 — 누르면 그 그룹의 오늘 현황 화면으로 이동한다.
-// 이동 전에 현재 그룹 쿠키를 바꿔서 통계·설정 탭도 그 그룹 기준이 되게 한다.
+// 홈 화면의 내 그룹 목록 — 누르면 현재 그룹을 그 그룹으로 바꾸고 "오늘" 탭으로 이동.
+// 오늘·통계·설정 탭이 모두 선택한 그룹 기준으로 동작하게 된다.
 export default function GroupList({ groups }: { groups: GroupListItem[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -29,9 +29,10 @@ export default function GroupList({ groups }: { groups: GroupListItem[] }) {
         body: JSON.stringify({ groupId }),
       });
     } catch {
-      // 쿠키 전환 실패해도 상세 화면 자체는 볼 수 있으므로 계속 진행
+      // 쿠키 전환에 실패해도 오늘 탭은 기존 그룹 기준으로 열린다
     }
-    router.push(`/group/${groupId}`);
+    router.push("/today");
+    router.refresh();
     setBusy(false);
   }
 
