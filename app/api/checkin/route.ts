@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { getAuthed } from "@/lib/auth";
-import { kstParts, judgeLate } from "@/lib/time";
+import { kstParts, judgeLate, fmtTimeKST } from "@/lib/time";
 import { purgeOldPhotosOnce } from "@/lib/retention";
+import { sendPushToUsers } from "@/lib/push";
 
 export const runtime = "nodejs";
 
@@ -98,6 +100,36 @@ export async function POST(req: NextRequest) {
         error: already ? "이미 출근 도장을 찍었어요" : "기록 저장 실패",
       });
     }
+  }
+
+  // 출석 알림 — 응답을 보낸 뒤 백그라운드로 발송 (알림이 인증을 늦추지 않게)
+  const okGroups = targets.filter(({ group }) =>
+    results.some((r) => r.groupId === group.id && r.ok)
+  );
+  if (okGroups.length > 0) {
+    const username = auth.user.username;
+    const time = fmtTimeKST(now.toISOString()).slice(0, 5);
+    after(async () => {
+      for (const { group } of okGroups) {
+        try {
+          const watchers = (await d.listMembers(group.id)).filter(
+            (m) => m.notify_checkin && m.user_id !== auth.user.id
+          );
+          await sendPushToUsers(
+            d,
+            [...new Set(watchers.map((m) => m.user_id))],
+            {
+              title: group.name,
+              body: `🥳 ${username}님이 출근 도장을 쿵! 찍었어요 (${time})`,
+              url: "/today",
+              tag: `checkin-${group.id}`,
+            }
+          );
+        } catch (e) {
+          console.error("[push] 출석 알림 실패:", e instanceof Error ? e.message : e);
+        }
+      }
+    });
   }
 
   const anyOk = results.some((r) => r.ok);

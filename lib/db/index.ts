@@ -1,4 +1,4 @@
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub } from "../types";
 
 // PIN 재설정 임시 코드 (그룹 관리자가 발급, 해시로 저장)
 export interface PinReset {
@@ -83,8 +83,12 @@ export interface DB {
   listAllMembers(groupId: string): Promise<Member[]>;
   updateMembership(
     id: string,
-    patch: Partial<Pick<Member, "scheduled_time" | "workdays" | "is_admin">>
+    patch: Partial<
+      Pick<Member, "scheduled_time" | "workdays" | "is_admin" | "reminders" | "notify_checkin">
+    >
   ): Promise<void>;
+  /** 리마인더가 켜진(reminders != '') 활동 중 멤버십 전체 — 알림 크론에서 사용 */
+  listRemindableMemberships(): Promise<{ member: Member; group: Group }[]>;
   /** 그룹 나가기 — left_at을 기록하는 소프트 삭제. 기록은 남지만 집계에서 제외된다. */
   leaveMembership(id: string): Promise<void>;
 
@@ -101,6 +105,13 @@ export interface DB {
   deleteOverride(memberId: string, workDate: string): Promise<void>;
   getOverride(memberId: string, workDate: string): Promise<ScheduleOverride | null>;
   listOverrides(memberIds: string[], from: string, to: string): Promise<ScheduleOverride[]>;
+
+  // 웹 푸시 구독 (기기당 1개, endpoint 기준 upsert)
+  upsertPushSubscription(sub: PushSub): Promise<void>;
+  deletePushSubscription(userId: string, endpoint: string): Promise<void>;
+  listPushSubscriptionsByUsers(userIds: string[]): Promise<PushSub[]>;
+  /** 리마인더 중복 발송 방지 — 처음 기록하면 true, 이미 보냈으면 false */
+  tryLogReminder(memberId: string, workDate: string, offsetMin: number): Promise<boolean>;
 
   // PIN 재설정 임시 코드 (유저당 1개, upsert)
   upsertPinReset(userId: string, codeHash: string, expiresAt: string): Promise<void>;

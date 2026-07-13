@@ -39,8 +39,31 @@ export interface Member {
   scheduled_time: string; // 이 그룹에서의 기준 시각 "HH:MM"
   workdays: string; // ISO weekdays, e.g. "12345" (월~금)
   is_admin: boolean;
+  reminders: string; // 출근 리마인더 시점(분 전) 콤마 목록, 예 "5,30" ("" = 끔)
+  notify_checkin: boolean; // 같은 그룹 멤버 출석 알림 받기
   created_at: string; // 그룹 참여일
   left_at: string | null; // 그룹 나간 시각 (null = 활동 중)
+}
+
+// 출근 리마인더로 선택할 수 있는 시점 (분 전)
+export const REMINDER_OFFSETS = [5, 10, 15, 30, 60] as const;
+
+/** "5,30" 형태의 reminders 문자열 → 허용된 값만 걸러 숫자 배열로 */
+export function parseReminders(s: string): number[] {
+  if (!s) return [];
+  const allowed = new Set<number>(REMINDER_OFFSETS);
+  return [...new Set(s.split(","))]
+    .map((x) => parseInt(x, 10))
+    .filter((n) => allowed.has(n))
+    .sort((a, b) => a - b);
+}
+
+// 웹 푸시 구독 — 기기(브라우저)마다 한 줄
+export interface PushSub {
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
 }
 
 export interface Checkin {

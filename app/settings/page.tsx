@@ -9,6 +9,7 @@ import {
   OverrideManager,
   GroupSettings,
 } from "@/components/SettingsForms";
+import NotificationSettings from "@/components/NotificationSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,12 @@ export default async function Settings() {
         <MemberSettings
           scheduledTime={member.scheduled_time}
           workdays={member.workdays}
+        />
+        <NotificationSettings
+          groupName={group.name}
+          reminders={member.reminders}
+          notifyCheckin={member.notify_checkin}
+          vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         />
         <AbsenceManager absences={absences} />
         <OverrideManager overrides={overrides} defaultTime={member.scheduled_time} />
