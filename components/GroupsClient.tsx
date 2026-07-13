@@ -96,8 +96,13 @@ export default function GroupsClient() {
           <input type="time" value={createTime} onChange={(e) => setCreateTime(e.target.value)} />
         </label>
         <label className="field">
-          기록 시작일
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          기록 시작일 (오늘 이후)
+          <input
+            type="date"
+            value={startDate}
+            min={todayKST()}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
         </label>
         <p className="muted" style={{ marginTop: 0 }}>
           이 날짜부터 출근 기록과 벌금 판정이 시작돼요. 그 전 날짜는 미출근으로 치지

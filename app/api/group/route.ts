@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest) {
   if (body.startDate !== undefined) {
     if (!isValidStartDate(body.startDate, today)) {
       return NextResponse.json(
-        { error: "시작일이 올바르지 않아요 (오늘 기준 1년 이내)." },
+        { error: "시작일은 오늘부터 1년 이내로만 선택할 수 있어요." },
         { status: 400 }
       );
     }

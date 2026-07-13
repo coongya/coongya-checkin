@@ -410,7 +410,8 @@ export function GroupSettings(props: {
       name,
       fineLate: Number(fineLate),
       fineAbsent: Number(fineAbsent),
-      startDate,
+      // 시작일은 실제로 바꾼 경우에만 전송 — 기존 값이 과거여도 다른 설정 저장이 막히지 않게
+      ...(startDate !== props.startDate ? { startDate } : {}),
     });
     setBusy(false);
     setMsg(err ? { ok: false, text: err } : { ok: true, text: "저장했어요! 🎉" });
@@ -515,11 +516,13 @@ export function GroupSettings(props: {
             <input
               type="date"
               value={startDate}
+              min={new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" })}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </label>
           <p className="muted" style={{ marginTop: 0 }}>
-            시작일 전 날짜는 출근 기록·벌금 판정에서 제외돼요.
+            시작일 전 날짜는 출근 기록·벌금 판정에서 제외돼요. 변경은 오늘 이후
+            날짜로만 할 수 있어요.
           </p>
           {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}
           <button className="btn" onClick={save} disabled={busy}>
