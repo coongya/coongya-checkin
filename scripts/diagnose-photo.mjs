@@ -78,6 +78,29 @@ try {
     }
     await sb.storage.from(BUCKET).remove([testPath]);
   }
+
+  // Blob(FormData 경로) 업로드 라운드트립 — 수정된 uploadPhoto와 동일한 경로
+  const blobPath = `debug/${Date.now()}-blob.jpg`;
+  const blob = new Blob([new Uint8Array(tiny)], { type: "image/jpeg" });
+  const { error: upErr2 } = await sb.storage
+    .from(BUCKET)
+    .upload(blobPath, blob, { contentType: "image/jpeg", upsert: true });
+  if (upErr2) out("blobUploadError", upErr2.message);
+  else {
+    const { data: dl2, error: dl2Err } = await sb.storage.from(BUCKET).download(blobPath);
+    if (dl2Err) out("blobDownloadError", dl2Err.message);
+    else {
+      const ab2 = await dl2.arrayBuffer();
+      out("blobRoundtrip", {
+        uploadedSize: tiny.byteLength,
+        storedSize: ab2.byteLength,
+        type: dl2.type,
+        magic: hex(ab2),
+        intact: Buffer.from(ab2).equals(tiny),
+      });
+    }
+    await sb.storage.from(BUCKET).remove([blobPath]);
+  }
 } catch (e) {
   out("fatal", String(e));
 }
