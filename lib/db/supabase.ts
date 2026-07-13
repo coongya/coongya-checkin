@@ -333,7 +333,12 @@ export function supabaseDb(): DB {
     },
 
     async uploadPhoto(path, data, contentType) {
-      const { error } = await sb.storage.from(BUCKET).upload(path, data, {
+      // ⚠️ Buffer를 그대로 넘기면 안 됨: Vercel 함수 런타임의 fetch 계층이
+      // Buffer body를 UTF-8 문자열로 변환해 바이너리가 깨진다(모든 바이트가
+      // U+FFFD로 치환된 JPEG가 저장됨). Blob으로 감싸면 storage-js가 브라우저
+      // 업로드와 동일한 multipart 경로를 타서 바이트가 그대로 보존된다.
+      const blob = new Blob([new Uint8Array(data)], { type: contentType });
+      const { error } = await sb.storage.from(BUCKET).upload(path, blob, {
         contentType,
         upsert: false,
       });
