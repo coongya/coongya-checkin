@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule } from "../types";
 import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
 
 const BUCKET = "checkin-photos";
@@ -86,6 +86,35 @@ export function supabaseDb(): DB {
     },
     async updateGroup(id, patch) {
       const { error } = await sb.from("groups").update(patch).eq("id", id);
+      fail(error);
+    },
+    async listFineHistory(groupId) {
+      const { data, error } = await sb
+        .from("group_fine_history")
+        .select("effective_from, fine_late, fine_absent")
+        .eq("group_id", groupId)
+        .order("effective_from");
+      fail(error);
+      return (data as FineRule[]) ?? [];
+    },
+    async upsertFineRule(groupId, effectiveFrom, fineLate, fineAbsent) {
+      const { error } = await sb.from("group_fine_history").upsert(
+        {
+          group_id: groupId,
+          effective_from: effectiveFrom,
+          fine_late: fineLate,
+          fine_absent: fineAbsent,
+        },
+        { onConflict: "group_id,effective_from" }
+      );
+      fail(error);
+    },
+    async deleteFineRulesAfter(groupId, afterDate) {
+      const { error } = await sb
+        .from("group_fine_history")
+        .delete()
+        .eq("group_id", groupId)
+        .gt("effective_from", afterDate);
       fail(error);
     },
     async deleteGroup(id) {

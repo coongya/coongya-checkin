@@ -3,12 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+// 오늘 날짜 (KST, YYYY-MM-DD) — 시작일 입력의 기본값
+function todayKST(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
+
 export default function GroupsClient() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [joinTime, setJoinTime] = useState("09:00");
   const [groupName, setGroupName] = useState("");
   const [createTime, setCreateTime] = useState("09:00");
+  const [startDate, setStartDate] = useState(todayKST());
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -44,7 +50,7 @@ export default function GroupsClient() {
   }
 
   async function create() {
-    const data = await post("/api/groups", { groupName, scheduledTime: createTime });
+    const data = await post("/api/groups", { groupName, scheduledTime: createTime, startDate });
     if (data) {
       setGroupName("");
       router.push("/dashboard");
@@ -89,7 +95,20 @@ export default function GroupsClient() {
           이 그룹에서 나의 기준 출근 시각
           <input type="time" value={createTime} onChange={(e) => setCreateTime(e.target.value)} />
         </label>
-        <button className="btn" onClick={create} disabled={busy || !groupName.trim()}>
+        <label className="field">
+          기록 시작일 (오늘 이후)
+          <input
+            type="date"
+            value={startDate}
+            min={todayKST()}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </label>
+        <p className="muted" style={{ marginTop: 0 }}>
+          이 날짜부터 출근 기록과 벌금 판정이 시작돼요. 그 전 날짜는 미출근으로 치지
+          않아요. (나중에 그룹 설정에서 바꿀 수 있어요)
+        </p>
+        <button className="btn" onClick={create} disabled={busy || !groupName.trim() || !startDate}>
           만들기
         </button>
       </div>

@@ -68,6 +68,16 @@ export function validateUsername(raw: unknown): { name: string } | { error: stri
   return { name };
 }
 
+/** 그룹 시작일 검증 — 오늘(KST)부터 미래 1년 이내의 YYYY-MM-DD (과거 불가) */
+export function isValidStartDate(s: unknown, todayStr: string): s is string {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const t = new Date(s + "T00:00:00Z").getTime();
+  if (isNaN(t)) return false;
+  const today = new Date(todayStr + "T00:00:00Z").getTime();
+  const yearMs = 366 * 24 * 60 * 60 * 1000;
+  return t >= today && t - today <= yearMs;
+}
+
 export function isValidWorkdays(s: unknown): s is string {
   return typeof s === "string" && /^[1-7]{1,7}$/.test(s) && new Set(s).size === s.length;
 }

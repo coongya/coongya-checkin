@@ -30,11 +30,37 @@ create table if not exists groups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   invite_code text not null unique,
-  fine_late int not null default 10000,   -- 지각 1회 벌금 (원)
-  fine_absent int not null default 10000, -- 무단 미출근 벌금 (원)
+  fine_late int not null default 10000,   -- 지각 1회 벌금 (원) — 현재 금액 (표시용)
+  fine_absent int not null default 10000, -- 무단 미출근 벌금 (원) — 현재 금액 (표시용)
   timezone text not null default 'Asia/Seoul',
+  start_date date not null default (now() at time zone 'Asia/Seoul')::date, -- 기록·벌금 시작일
   created_at timestamptz not null default now()
 );
+
+-- v3 → v4 마이그레이션: 기존 groups 테이블에 시작일 추가 (기존 그룹은 만든 날짜가 시작일)
+alter table groups add column if not exists start_date date;
+update groups set start_date = (created_at at time zone 'Asia/Seoul')::date where start_date is null;
+alter table groups alter column start_date set not null;
+alter table groups alter column start_date set default (now() at time zone 'Asia/Seoul')::date;
+
+-- 벌금 금액 변경 이력 — 날짜별 벌금 계산은 "그 날짜에 유효했던 금액"으로 한다.
+-- 금액을 바꿔도 과거 벌금이 다시 계산되지 않도록 변경 시점(적용 시작일)마다 한 줄씩 기록.
+create table if not exists group_fine_history (
+  id uuid primary key default gen_random_uuid(),
+  group_id uuid not null references groups(id) on delete cascade,
+  effective_from date not null,  -- 이 날짜부터 아래 금액 적용
+  fine_late int not null,
+  fine_absent int not null,
+  created_at timestamptz not null default now(),
+  unique (group_id, effective_from)
+);
+create index if not exists idx_fine_history_group on group_fine_history(group_id);
+
+-- 이력이 없는 기존 그룹은 현재 금액을 시작일부터 적용한 것으로 시드
+insert into group_fine_history (group_id, effective_from, fine_late, fine_absent)
+select g.id, g.start_date, g.fine_late, g.fine_absent
+from groups g
+where not exists (select 1 from group_fine_history h where h.group_id = g.id);
 
 -- 멤버십: 한 계정이 여러 그룹에 참여. 그룹별 기준 시각·근무 요일은 여기에.
 -- left_at이 채워지면 "나간" 멤버십 — 데이터(체크인 등)는 남지만 집계·화면에서 제외.

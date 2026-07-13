@@ -1,6 +1,6 @@
 // 로컬 개발/테스트용 인메모리 DB (MOCK_DB=1). 서버 재시작 시 초기화됩니다.
 import { randomUUID } from "node:crypto";
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule } from "../types";
 import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
 
 interface MembershipRow {
@@ -17,6 +17,7 @@ interface MembershipRow {
 interface Store {
   users: User[];
   groups: Group[];
+  fineRules: (FineRule & { group_id: string })[];
   memberships: MembershipRow[];
   checkins: Checkin[];
   absences: Absence[];
@@ -32,6 +33,7 @@ function store(): Store {
     g.__kungyaStore = {
       users: [],
       groups: [],
+      fineRules: [],
       memberships: [],
       checkins: [],
       absences: [],
@@ -103,6 +105,39 @@ export function memoryDb(): DB {
       const grp = store().groups.find((x) => x.id === id);
       if (grp) Object.assign(grp, patch);
     },
+    async listFineHistory(groupId) {
+      return store()
+        .fineRules.filter((r) => r.group_id === groupId)
+        .map(({ effective_from, fine_late, fine_absent }) => ({
+          effective_from,
+          fine_late,
+          fine_absent,
+        }))
+        .sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+    },
+    async upsertFineRule(groupId, effectiveFrom, fineLate, fineAbsent) {
+      const s = store();
+      const existing = s.fineRules.find(
+        (r) => r.group_id === groupId && r.effective_from === effectiveFrom
+      );
+      if (existing) {
+        existing.fine_late = fineLate;
+        existing.fine_absent = fineAbsent;
+      } else {
+        s.fineRules.push({
+          group_id: groupId,
+          effective_from: effectiveFrom,
+          fine_late: fineLate,
+          fine_absent: fineAbsent,
+        });
+      }
+    },
+    async deleteFineRulesAfter(groupId, afterDate) {
+      const s = store();
+      s.fineRules = s.fineRules.filter(
+        (r) => !(r.group_id === groupId && r.effective_from > afterDate)
+      );
+    },
     async deleteGroup(id) {
       const s = store();
       const memberIds = new Set(
@@ -122,6 +157,7 @@ export function memoryDb(): DB {
       s.absences = s.absences.filter((a) => !memberIds.has(a.member_id));
       s.overrides = s.overrides.filter((o) => !memberIds.has(o.member_id));
       s.memberships = s.memberships.filter((m) => m.group_id !== id);
+      s.fineRules = s.fineRules.filter((r) => r.group_id !== id);
       s.groups = s.groups.filter((g) => g.id !== id);
     },
 

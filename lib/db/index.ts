@@ -1,4 +1,4 @@
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule } from "../types";
 
 // PIN 재설정 임시 코드 (그룹 관리자가 발급, 해시로 저장)
 export interface PinReset {
@@ -13,6 +13,7 @@ export interface NewGroup {
   invite_code: string;
   fine_late: number;
   fine_absent: number;
+  start_date: string; // "YYYY-MM-DD" — 기록·벌금 시작일
 }
 
 export interface NewUser {
@@ -55,8 +56,19 @@ export interface DB {
   getGroupByInviteCode(code: string): Promise<Group | null>;
   updateGroup(
     id: string,
-    patch: Partial<Pick<Group, "name" | "fine_late" | "fine_absent">>
+    patch: Partial<Pick<Group, "name" | "fine_late" | "fine_absent" | "start_date">>
   ): Promise<void>;
+  /** 벌금 변경 이력 (effective_from 오름차순). 날짜별 벌금 계산에 사용 */
+  listFineHistory(groupId: string): Promise<FineRule[]>;
+  /** 특정 날짜부터 적용되는 벌금 금액 기록 (같은 날짜에 또 바꾸면 덮어씀) */
+  upsertFineRule(
+    groupId: string,
+    effectiveFrom: string,
+    fineLate: number,
+    fineAbsent: number
+  ): Promise<void>;
+  /** afterDate보다 뒤에 시작하는 벌금 규칙 삭제 — "오늘부터 새 금액"이 미래 예약 규칙에 덮이지 않게 */
+  deleteFineRulesAfter(groupId: string, afterDate: string): Promise<void>;
   /** 그룹과 모든 하위 데이터(멤버십·출근 기록·휴가·사진) 삭제 */
   deleteGroup(id: string): Promise<void>;
 

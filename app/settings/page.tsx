@@ -58,6 +58,7 @@ export default async function Settings() {
           isAdmin={member.is_admin}
           fineLate={group.fine_late}
           fineAbsent={group.fine_absent}
+          startDate={group.start_date}
           inviteCode={group.invite_code}
           groupName={group.name}
           resetTargets={resetTargets}
