@@ -387,6 +387,7 @@ export function GroupSettings(props: {
   fineAbsent: number;
   inviteCode: string;
   groupName: string;
+  startDate: string;
   /** 관리자가 PIN 재설정 코드를 발급할 수 있는 대상 (본인 제외 멤버) */
   resetTargets: { id: string; name: string }[];
 }) {
@@ -394,6 +395,7 @@ export function GroupSettings(props: {
   const [name, setName] = useState(props.groupName);
   const [fineLate, setFineLate] = useState(String(props.fineLate));
   const [fineAbsent, setFineAbsent] = useState(String(props.fineAbsent));
+  const [startDate, setStartDate] = useState(props.startDate);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [resetCodes, setResetCodes] = useState<Record<string, string>>({});
@@ -408,6 +410,7 @@ export function GroupSettings(props: {
       name,
       fineLate: Number(fineLate),
       fineAbsent: Number(fineAbsent),
+      startDate,
     });
     setBusy(false);
     setMsg(err ? { ok: false, text: err } : { ok: true, text: "저장했어요! 🎉" });
@@ -503,6 +506,21 @@ export function GroupSettings(props: {
               onChange={(e) => setFineAbsent(e.target.value)}
             />
           </label>
+          <p className="muted" style={{ marginTop: 0 }}>
+            벌금 금액을 바꾸면 <b>오늘부터</b> 새 금액이 적용되고, 지난 날짜의 벌금은
+            그때 금액 그대로 유지돼요.
+          </p>
+          <label className="field">
+            기록 시작일
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </label>
+          <p className="muted" style={{ marginTop: 0 }}>
+            시작일 전 날짜는 출근 기록·벌금 판정에서 제외돼요.
+          </p>
           {msg && <div className={msg.ok ? "ok-msg" : "error-msg"}>{msg.text}</div>}
           <button className="btn" onClick={save} disabled={busy}>
             저장하기

@@ -2,10 +2,19 @@ export interface Group {
   id: string;
   name: string;
   invite_code: string;
+  fine_late: number; // 현재 지각 벌금 (이력이 없을 때의 대체값)
+  fine_absent: number; // 현재 무단 미출근 벌금 (이력이 없을 때의 대체값)
+  timezone: string;
+  start_date: string; // "YYYY-MM-DD" — 이 날짜부터 기록·벌금 판정 시작
+  created_at: string;
+}
+
+// 벌금 금액 변경 이력 — effective_from(포함)부터 이 금액이 적용된다.
+// 날짜별 벌금은 "그 날짜에 유효했던 금액"으로 계산해, 금액을 바꿔도 과거가 안 바뀐다.
+export interface FineRule {
+  effective_from: string; // "YYYY-MM-DD"
   fine_late: number;
   fine_absent: number;
-  timezone: string;
-  created_at: string;
 }
 
 // 계정 — 앱 전체에서 하나, 여러 그룹에 참여 가능

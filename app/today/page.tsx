@@ -38,6 +38,7 @@ export default async function Today() {
       badge = c.is_late
         ? { cls: "late", label: `😭 지각 +${c.late_minutes}분` }
         : { cls: "onTime", label: "🥳 출근" };
+    else if (today < group.start_date) badge = { cls: "restDay", label: "시작 전" };
     else if (!workday) badge = { cls: "restDay", label: "휴무" };
     else badge = { cls: "pending", label: "😴 미출근" };
     return { m, c, badge };

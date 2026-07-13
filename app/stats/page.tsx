@@ -39,10 +39,13 @@ export default async function Stats({
   const monthDates = datesOfMonth(month);
   const from = monthDates[0];
   const to = monthDates[monthDates.length - 1];
-  const checkins = await d.listCheckins(ids, from, to);
-  const absences = await d.listAbsences(ids, from, to);
+  const [checkins, absences, fineHistory] = await Promise.all([
+    d.listCheckins(ids, from, to),
+    d.listAbsences(ids, from, to),
+    d.listFineHistory(group.id),
+  ]);
 
-  const stats = groupMonthStats(group, members, month, kst.date, checkins, absences);
+  const stats = groupMonthStats(group, members, month, kst.date, checkins, absences, fineHistory);
   const myStats = stats.find((s) => s.member.id === member.id);
 
   // 랭킹: 벌금 많은 순 / 정시 출근 많은 순 — 동점자는 공동 순위 (RANK() 방식)

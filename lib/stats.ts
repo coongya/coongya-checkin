@@ -1,5 +1,5 @@
 // 통계/벌금 계산 — 순수 함수로 분리해 테스트 가능하게 유지
-import type { Group, Member, Checkin, Absence, DayStatus } from "./types";
+import type { Group, Member, Checkin, Absence, DayStatus, FineRule } from "./types";
 import { datesOfMonth, isWorkday, kstParts } from "./time";
 
 /** ISO 타임스탬프의 KST 날짜(YYYY-MM-DD). 값이 없으면 null. */
@@ -38,8 +38,29 @@ export interface MemberMonthStats {
 }
 
 /**
+ * 특정 날짜에 유효한 벌금 금액. 이력(effective_from 오름차순)에서 그 날짜 이전에
+ * 마지막으로 적용된 금액을 찾고, 이력이 없으면 그룹의 현재 금액을 쓴다.
+ * 금액을 바꿔도 과거 날짜의 벌금이 다시 계산되지 않도록 하기 위한 장치.
+ */
+export function finesOn(
+  group: Group,
+  fineHistory: FineRule[],
+  date: string
+): { late: number; absent: number } {
+  let late = group.fine_late;
+  let absent = group.fine_absent;
+  for (const r of fineHistory) {
+    if (r.effective_from > date) break;
+    late = r.fine_late;
+    absent = r.fine_absent;
+  }
+  return { late, absent };
+}
+
+/**
  * 한 멤버의 월간 기록 계산.
  * @param todayStr 오늘 날짜(KST, YYYY-MM-DD) — 이 날짜까지만 판정. 오늘 미인증은 pending.
+ * @param fineHistory 벌금 변경 이력 — 날짜별로 그 시점의 금액을 적용 (없으면 현재 금액)
  */
 export function memberMonthStats(
   group: Group,
@@ -47,7 +68,8 @@ export function memberMonthStats(
   month: string,
   todayStr: string,
   checkins: Checkin[],
-  absences: Absence[]
+  absences: Absence[],
+  fineHistory: FineRule[] = []
 ): MemberMonthStats {
   const byDateCheckin = new Map(checkins.map((c) => [c.work_date, c]));
   const byDateAbsence = new Map(absences.map((a) => [a.work_date, a]));
@@ -73,6 +95,8 @@ export function memberMonthStats(
 
     if (date > todayStr) {
       status = "future";
+    } else if (group.start_date && date < group.start_date && !checkin && !absence) {
+      status = "restDay"; // 그룹 시작일 전 — 기록·벌금 대상 아님
     } else if (joinedDate && date < joinedDate && !checkin && !absence) {
       status = "restDay"; // 참여 전
     } else if (leftDate && date > leftDate && !checkin && !absence) {
@@ -89,7 +113,7 @@ export function memberMonthStats(
           status = "late";
           lateCount++;
           lateMinutesTotal += checkin.late_minutes;
-          fine = group.fine_late;
+          fine = finesOn(group, fineHistory, date).late;
         } else {
           status = "onTime";
           onTimeCount++;
@@ -100,7 +124,7 @@ export function memberMonthStats(
       } else {
         status = "absent"; // 무단 미출근
         absentCount++;
-        fine = group.fine_absent;
+        fine = finesOn(group, fineHistory, date).absent;
       }
     }
     totalFine += fine;
@@ -126,7 +150,8 @@ export function groupMonthStats(
   month: string,
   todayStr: string,
   checkins: Checkin[],
-  absences: Absence[]
+  absences: Absence[],
+  fineHistory: FineRule[] = []
 ): MemberMonthStats[] {
   return members.map((m) =>
     memberMonthStats(
@@ -135,7 +160,8 @@ export function groupMonthStats(
       month,
       todayStr,
       checkins.filter((c) => c.member_id === m.id),
-      absences.filter((a) => a.member_id === m.id)
+      absences.filter((a) => a.member_id === m.id),
+      fineHistory
     )
   );
 }

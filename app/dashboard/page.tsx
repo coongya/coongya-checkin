@@ -51,6 +51,7 @@ export default async function Dashboard() {
       myBadge = myCheckin.is_late
         ? { cls: "late", label: `😭 +${myCheckin.late_minutes}분` }
         : { cls: "onTime", label: "🥳 출근" };
+    else if (today < group.start_date) myBadge = { cls: "restDay", label: "시작 전" };
     else if (!workday) myBadge = { cls: "restDay", label: "휴무" };
     else myBadge = { cls: "pending", label: "😴 인증 전" };
 
@@ -68,7 +69,10 @@ export default async function Dashboard() {
   // 인증 카드 상태 — 오늘 근무일인 그룹들 기준
   const effectiveTime = (memberId: string, fallback: string) =>
     myOverrides.find((o) => o.member_id === memberId)?.scheduled_time ?? fallback;
-  const workdayMs = auth.memberships.filter(({ member }) => isWorkday(today, member.workdays));
+  // 시작일이 안 된 그룹은 인증 카드 판정에서 제외 (카운트다운·미인증 압박 없음)
+  const workdayMs = auth.memberships.filter(
+    ({ member, group }) => isWorkday(today, member.workdays) && today >= group.start_date
+  );
   const activeMs = workdayMs.filter(
     ({ member }) => !myAbsences.some((a) => a.member_id === member.id)
   );
