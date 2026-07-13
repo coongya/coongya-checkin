@@ -45,6 +45,9 @@
   (지난 날짜·이미 인증한 날짜는 변경 불가)
 - **PIN 변경**: 현재 PIN 확인 후 변경 (시도 횟수 제한)
 - **통계**: 월별 성적표, 출근 달력(정시 출근하면 내 쿵야 도장이 쾅!), 벌금왕/성실왕 랭킹
+- **푸시 알림**: 출근 리마인더(기준 시각 5/10/15/30분·1시간 전, 복수 선택)와
+  멤버 출석 알림(그룹별 온오프) — 설정 탭에서 기기별로 켤 수 있어요
+  (아이폰은 홈 화면에 추가한 앱에서만, iOS 16.4+)
 - **공정성**: 그룹 참여일·그룹 기록 시작일 이전 날짜는 판정/벌금 대상에서 제외
 - **기록 시작일**: 그룹을 만들 때 기록·벌금이 시작되는 날짜를 정할 수 있어요
   (기본 오늘, 나중에 그룹 설정에서 변경 가능)
@@ -116,6 +119,46 @@ Supabase 단계를 진행한 뒤 값을 채워주세요.
 
 > 휴대폰 브라우저에서 열고 **홈 화면에 추가**하면 앱처럼 쓸 수 있어요.
 > 카메라는 HTTPS에서만 동작하는데 Vercel 배포는 기본 HTTPS라 문제없어요.
+
+### 3. 푸시 알림 설정 (선택)
+
+출근 리마인더·멤버 출석 알림을 쓰려면 두 가지를 추가하면 돼요.
+
+1. **VAPID 키 생성 + Vercel 환경변수 추가** (한 번만)
+
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+
+   | 이름 | 값 |
+   |---|---|
+   | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 생성된 Public Key |
+   | `VAPID_PRIVATE_KEY` | 생성된 Private Key (⚠️ 비공개) |
+   | `VAPID_SUBJECT` | `mailto:운영자이메일` |
+   | `CRON_SECRET` | 긴 랜덤 문자열 (`openssl rand -hex 24` 결과) |
+
+   추가 후 **Redeploy** 필요.
+
+2. **리마인더 크론 등록** (Supabase에서 매 분 알림 엔드포인트 호출)
+
+   Supabase 대시보드 → **Database → Extensions**에서 `pg_cron`과 `pg_net`을
+   켠 뒤, SQL Editor에서 실행 (URL과 CRON_SECRET은 본인 값으로):
+
+   ```sql
+   select cron.schedule(
+     'kungya-reminders', '* * * * *',
+     $$ select net.http_get(
+          url := 'https://<앱주소>.vercel.app/api/cron/reminders',
+          headers := '{"Authorization": "Bearer <CRON_SECRET 값>"}'::jsonb
+        ) $$
+   );
+   -- 해제: select cron.unschedule('kungya-reminders');
+   ```
+
+   출석 알림은 크론 없이도 동작해요 (인증 시 바로 발송). 크론은 리마인더에만 필요해요.
+
+3. **기기에서 켜기**: 설정 탭 → 알림 🔔 → "이 기기에서 알림 받기".
+   아이폰은 **홈 화면에 추가한 앱에서 열었을 때만** 켤 수 있어요 (iOS 16.4+).
 
 ## 운영 팁
 

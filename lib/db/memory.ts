@@ -1,6 +1,6 @@
 // 로컬 개발/테스트용 인메모리 DB (MOCK_DB=1). 서버 재시작 시 초기화됩니다.
 import { randomUUID } from "node:crypto";
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub } from "../types";
 import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
 
 interface MembershipRow {
@@ -10,6 +10,8 @@ interface MembershipRow {
   scheduled_time: string;
   workdays: string;
   is_admin: boolean;
+  reminders: string;
+  notify_checkin: boolean;
   created_at: string;
   left_at: string | null; // 나간 시각 (null = 활동 중)
 }
@@ -24,6 +26,8 @@ interface Store {
   overrides: ScheduleOverride[];
   photos: Map<string, { data: Buffer; contentType: string }>;
   pinResets: Map<string, PinReset>;
+  pushSubs: PushSub[];
+  reminderLog: Set<string>;
 }
 
 const g = globalThis as unknown as { __kungyaStore?: Store };
@@ -40,6 +44,8 @@ function store(): Store {
       overrides: [],
       photos: new Map(),
       pinResets: new Map(),
+      pushSubs: [],
+      reminderLog: new Set(),
     };
   }
   return g.__kungyaStore;
@@ -56,6 +62,8 @@ function toMember(row: MembershipRow): Member {
     scheduled_time: row.scheduled_time,
     workdays: row.workdays,
     is_admin: row.is_admin,
+    reminders: row.reminders,
+    notify_checkin: row.notify_checkin,
     created_at: row.created_at,
     left_at: row.left_at,
   };
@@ -173,6 +181,8 @@ export function memoryDb(): DB {
         id: randomUUID(),
         created_at: new Date().toISOString(),
         left_at: null,
+        reminders: "",
+        notify_checkin: false,
         ...nm,
       };
       store().memberships.push(row);
@@ -210,6 +220,36 @@ export function memoryDb(): DB {
     async updateMembership(id, patch) {
       const m = store().memberships.find((x) => x.id === id);
       if (m) Object.assign(m, patch);
+    },
+    async listRemindableMemberships() {
+      return store()
+        .memberships.filter((m) => m.reminders !== "" && !m.left_at)
+        .map((row) => ({
+          member: toMember(row),
+          group: store().groups.find((gr) => gr.id === row.group_id)!,
+        }))
+        .filter((x) => x.group);
+    },
+    async upsertPushSubscription(sub) {
+      const s = store();
+      const existing = s.pushSubs.find((x) => x.endpoint === sub.endpoint);
+      if (existing) Object.assign(existing, sub);
+      else s.pushSubs.push({ ...sub });
+    },
+    async deletePushSubscription(userId, endpoint) {
+      const s = store();
+      s.pushSubs = s.pushSubs.filter(
+        (x) => !(x.user_id === userId && x.endpoint === endpoint)
+      );
+    },
+    async listPushSubscriptionsByUsers(userIds) {
+      return store().pushSubs.filter((x) => userIds.includes(x.user_id));
+    },
+    async tryLogReminder(memberId, workDate, offsetMin) {
+      const key = `${memberId}|${workDate}|${offsetMin}`;
+      if (store().reminderLog.has(key)) return false;
+      store().reminderLog.add(key);
+      return true;
     },
     async leaveMembership(id) {
       const m = store().memberships.find((x) => x.id === id);

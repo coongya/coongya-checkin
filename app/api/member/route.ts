@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getAuthed, isValidHHMM, isValidPin, isValidWorkdays, validateUsername } from "@/lib/auth";
 import { hashPin, verifyPin } from "@/lib/session";
 import { allowRequest } from "@/lib/ratelimit";
-import { AVATAR_INFO } from "@/lib/types";
+import { AVATAR_INFO, parseReminders } from "@/lib/types";
 
 // 내 설정 변경
 // - scheduledTime / workdays: 현재 그룹의 멤버십 설정
@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest) {
   if (!body) return NextResponse.json({ error: "잘못된 요청이에요." }, { status: 400 });
 
   const d = await db();
-  const membershipPatch: Record<string, string> = {};
+  const membershipPatch: Record<string, string | boolean> = {};
   const userPatch: Record<string, string> = {};
 
   if (body.scheduledTime !== undefined) {
@@ -30,6 +30,19 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "근무 요일이 올바르지 않아요." }, { status: 400 });
     }
     membershipPatch.workdays = body.workdays;
+  }
+  if (body.reminders !== undefined) {
+    if (typeof body.reminders !== "string" || body.reminders.length > 30) {
+      return NextResponse.json({ error: "리마인더 설정이 올바르지 않아요." }, { status: 400 });
+    }
+    // 허용된 값(5/10/15/30/60)만 걸러 정규화해 저장
+    membershipPatch.reminders = parseReminders(body.reminders).join(",");
+  }
+  if (body.notifyCheckin !== undefined) {
+    if (typeof body.notifyCheckin !== "boolean") {
+      return NextResponse.json({ error: "알림 설정이 올바르지 않아요." }, { status: 400 });
+    }
+    membershipPatch.notify_checkin = body.notifyCheckin;
   }
   if (body.username !== undefined) {
     const checked = validateUsername(body.username);

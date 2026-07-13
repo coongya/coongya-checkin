@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { isMock } from "@/lib/db";
+import PushInit from "@/components/PushInit";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        <PushInit />
         {isMock() && (
           <div className="demo-banner">
             🚧 데모 모드예요 — 데이터가 영구 저장되지 않아요. (Supabase 연결 시 해제)

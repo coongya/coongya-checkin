@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub } from "../types";
 import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
 
 const BUCKET = "checkin-photos";
@@ -23,6 +23,8 @@ interface MembershipJoined {
   scheduled_time: string;
   workdays: string;
   is_admin: boolean;
+  reminders: string | null;
+  notify_checkin: boolean | null;
   created_at: string;
   left_at: string | null;
   users: { username: string; avatar: string } | null;
@@ -38,6 +40,8 @@ function toMember(row: MembershipJoined): Member {
     scheduled_time: row.scheduled_time,
     workdays: row.workdays,
     is_admin: row.is_admin,
+    reminders: row.reminders ?? "",
+    notify_checkin: row.notify_checkin ?? false,
     created_at: row.created_at,
     left_at: row.left_at ?? null,
   };
@@ -218,6 +222,17 @@ export function supabaseDb(): DB {
       const { error } = await sb.from("memberships").update(patch).eq("id", id);
       fail(error);
     },
+    async listRemindableMemberships() {
+      const { data, error } = await sb
+        .from("memberships")
+        .select("*, users(username, avatar), groups(*)")
+        .neq("reminders", "")
+        .is("left_at", null);
+      fail(error);
+      return ((data ?? []) as (MembershipJoined & { groups: Group })[])
+        .filter((row) => row.groups)
+        .map((row) => ({ member: toMember(row), group: row.groups }));
+    },
     async leaveMembership(id) {
       const { error } = await sb
         .from("memberships")
@@ -326,6 +341,40 @@ export function supabaseDb(): DB {
         .lte("work_date", to);
       fail(error);
       return (data as ScheduleOverride[]) ?? [];
+    },
+
+    async upsertPushSubscription(sub) {
+      const { error } = await sb
+        .from("push_subscriptions")
+        .upsert(sub, { onConflict: "endpoint" });
+      fail(error);
+    },
+    async deletePushSubscription(userId, endpoint) {
+      const { error } = await sb
+        .from("push_subscriptions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("endpoint", endpoint);
+      fail(error);
+    },
+    async listPushSubscriptionsByUsers(userIds) {
+      if (userIds.length === 0) return [];
+      const { data, error } = await sb
+        .from("push_subscriptions")
+        .select("user_id, endpoint, p256dh, auth")
+        .in("user_id", userIds);
+      fail(error);
+      return (data as PushSub[]) ?? [];
+    },
+    async tryLogReminder(memberId, workDate, offsetMin) {
+      const { error } = await sb
+        .from("reminder_log")
+        .insert({ member_id: memberId, work_date: workDate, offset_min: offsetMin });
+      if (error) {
+        if (error.code === "23505") return false; // 이미 보냄
+        throw new Error(error.message);
+      }
+      return true;
     },
 
     async upsertPinReset(userId, codeHash, expiresAt) {

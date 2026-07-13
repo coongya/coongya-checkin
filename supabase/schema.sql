@@ -79,6 +79,32 @@ create table if not exists memberships (
 create unique index if not exists idx_memberships_active_unique
   on memberships(user_id, group_id) where (left_at is null);
 
+-- v4 → v5 마이그레이션: 푸시 알림 설정 (그룹별)
+-- reminders: 출근 리마인더 시점(분 전) 콤마 목록, 예: "5,30" (빈 문자열 = 끔)
+-- notify_checkin: 같은 그룹 멤버가 출석하면 알림 받기
+alter table memberships add column if not exists reminders text not null default '';
+alter table memberships add column if not exists notify_checkin boolean not null default false;
+
+-- 웹 푸시 구독 — 기기(브라우저)마다 한 줄. endpoint가 기기 식별자 역할.
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_push_subs_user on push_subscriptions(user_id);
+
+-- 리마인더 중복 발송 방지 — (멤버, 날짜, N분 전)당 1회만
+create table if not exists reminder_log (
+  member_id uuid not null references memberships(id) on delete cascade,
+  work_date date not null,
+  offset_min int not null,
+  created_at timestamptz not null default now(),
+  primary key (member_id, work_date, offset_min)
+);
+
 -- 출근 기록: member_id는 membership id를 가리킴
 create table if not exists checkins (
   id uuid primary key default gen_random_uuid(),
