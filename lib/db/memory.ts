@@ -1,6 +1,6 @@
 // 로컬 개발/테스트용 인메모리 DB (MOCK_DB=1). 서버 재시작 시 초기화됩니다.
 import { randomUUID } from "node:crypto";
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub, Holiday } from "../types";
 import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
 
 interface MembershipRow {
@@ -24,6 +24,7 @@ interface Store {
   checkins: Checkin[];
   absences: Absence[];
   overrides: ScheduleOverride[];
+  holidays: Holiday[];
   photos: Map<string, { data: Buffer; contentType: string }>;
   pinResets: Map<string, PinReset>;
   pushSubs: PushSub[];
@@ -42,6 +43,7 @@ function store(): Store {
       checkins: [],
       absences: [],
       overrides: [],
+      holidays: [],
       photos: new Map(),
       pinResets: new Map(),
       pushSubs: [],
@@ -336,6 +338,19 @@ export function memoryDb(): DB {
       return store().overrides.filter(
         (o) => memberIds.includes(o.member_id) && o.work_date >= from && o.work_date <= to
       );
+    },
+
+    async listHolidays(from, to) {
+      return store()
+        .holidays.filter((h) => h.date >= from && h.date <= to)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    },
+    async replaceHolidays(year, rows) {
+      const s = store();
+      s.holidays = [
+        ...s.holidays.filter((h) => !h.date.startsWith(`${year}-`)),
+        ...rows.map((r) => ({ ...r })),
+      ];
     },
 
     async upsertPinReset(userId, codeHash, expiresAt) {

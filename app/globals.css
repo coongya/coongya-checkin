@@ -591,6 +591,10 @@ label.field select:focus {
   background: #fff;
   border: 1.5px dashed var(--line-strong);
 }
+.cal .cell.holiday {
+  color: var(--red);
+  font-weight: 700;
+}
 .cal .dow {
   aspect-ratio: auto;
   background: transparent;

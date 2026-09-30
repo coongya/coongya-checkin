@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kstParts, fmtTimeKST, isWorkday } from "@/lib/time";
+import { loadHolidays } from "@/lib/holidays";
 import { avatarInfo } from "@/lib/types";
 import { TopBar, TabBar } from "@/components/Nav";
 import KungyaFace from "@/components/KungyaFace";
@@ -20,10 +21,11 @@ export default async function Today() {
   const today = kstParts().date;
   const members = await d.listMembers(group.id);
   const ids = members.map((m) => m.id);
-  const [checkins, absences, overrides] = await Promise.all([
+  const [checkins, absences, overrides, holidays] = await Promise.all([
     d.listCheckins(ids, today, today),
     d.listAbsences(ids, today, today),
     d.listOverrides(ids, today, today),
+    loadHolidays(d, today, today),
   ]);
   const effectiveTime = (m: (typeof members)[number]) =>
     overrides.find((o) => o.member_id === m.id)?.scheduled_time ?? m.scheduled_time;
@@ -31,7 +33,7 @@ export default async function Today() {
   const rows = members.map((m) => {
     const c = checkins.find((x) => x.member_id === m.id);
     const a = absences.find((x) => x.member_id === m.id);
-    const workday = isWorkday(today, m.workdays);
+    const workday = isWorkday(today, m.workdays, holidays);
     let badge: { cls: string; label: string };
     if (a) badge = { cls: "excused", label: `🏠 ${a.reason}` };
     else if (c)
@@ -39,7 +41,7 @@ export default async function Today() {
         ? { cls: "late", label: `😭 지각 +${c.late_minutes}분` }
         : { cls: "onTime", label: "🥳 출근" };
     else if (today < group.start_date) badge = { cls: "restDay", label: "시작 전" };
-    else if (!workday) badge = { cls: "restDay", label: "휴무" };
+    else if (!workday) badge = { cls: "restDay", label: holidays.get(today) ?? "휴무" };
     else badge = { cls: "pending", label: "😴 미출근" };
     return { m, c, badge };
   });

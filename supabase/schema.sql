@@ -136,6 +136,14 @@ create table if not exists schedule_overrides (
   unique (member_id, work_date)
 );
 
+-- 공휴일 — 공공데이터포털 특일정보에서 하루 한 번 동기화 (/api/cron/holidays).
+-- 전 그룹 공통으로 휴무 처리: 벌금·통계·리마인더 대상에서 빠진다.
+create table if not exists holidays (
+  date date primary key,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
 -- PIN 재설정 임시 코드 — 그룹 관리자가 발급한 6자리 코드의 해시 (유저당 1개, 1회용)
 create table if not exists pin_resets (
   user_id uuid primary key references users(id) on delete cascade,

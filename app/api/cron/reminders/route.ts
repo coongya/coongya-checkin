@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { kstParts, isWorkday, minutesFromHHMM } from "@/lib/time";
 import { sendPushToUsers, pushConfigured } from "@/lib/push";
 import { parseReminders } from "@/lib/types";
+import { loadHolidays } from "@/lib/holidays";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,14 @@ export async function GET(req: NextRequest) {
   const nowMin = kst.minutesOfDay;
 
   const d = await db();
-  const all = await d.listRemindableMemberships();
-  // 오늘 판정 대상만 추리기 — 그룹 시작 전/휴무일 제외
+  const [all, holidays] = await Promise.all([
+    d.listRemindableMemberships(),
+    loadHolidays(d, today, today),
+  ]);
+  // 오늘 판정 대상만 추리기 — 그룹 시작 전/휴무일/공휴일 제외
   const candidates = all.filter(
-    ({ member, group }) => today >= group.start_date && isWorkday(today, member.workdays)
+    ({ member, group }) =>
+      today >= group.start_date && isWorkday(today, member.workdays, holidays)
   );
   if (candidates.length === 0) return NextResponse.json({ ok: true, sent: 0 });
 

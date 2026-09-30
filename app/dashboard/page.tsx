@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kstParts, isWorkday, minutesFromHHMM } from "@/lib/time";
+import { loadHolidays } from "@/lib/holidays";
 import { TopBar, TabBar } from "@/components/Nav";
 import CheckinCard from "@/components/CheckinCard";
 import GroupList, { type GroupListItem } from "@/components/GroupList";
@@ -20,10 +21,11 @@ export default async function Dashboard() {
   const today = kstParts().date;
   const myIds = auth.memberships.map((m) => m.member.id);
   // 쿼리를 병렬로 실행해 응답 시간을 줄인다 (Supabase 왕복이 가장 큰 비용)
-  const [myCheckins, myAbsences, myOverrides, groupData] = await Promise.all([
+  const [myCheckins, myAbsences, myOverrides, holidays, groupData] = await Promise.all([
     d.listCheckins(myIds, today, today),
     d.listAbsences(myIds, today, today),
     d.listOverrides(myIds, today, today),
+    loadHolidays(d, today, today),
     Promise.all(
       auth.memberships.map(async ({ group }) => {
         const members = await d.listMembers(group.id);
@@ -44,7 +46,7 @@ export default async function Dashboard() {
     const { members, checkins } = gd;
     const myCheckin = myCheckins.find((c) => c.member_id === member.id);
     const myAbsence = myAbsences.find((a) => a.member_id === member.id);
-    const workday = isWorkday(today, member.workdays);
+    const workday = isWorkday(today, member.workdays, holidays);
     let myBadge: { cls: string; label: string };
     if (myAbsence) myBadge = { cls: "excused", label: `🏠 ${myAbsence.reason}` };
     else if (myCheckin)
@@ -52,7 +54,7 @@ export default async function Dashboard() {
         ? { cls: "late", label: `😭 +${myCheckin.late_minutes}분` }
         : { cls: "onTime", label: "🥳 출근" };
     else if (today < group.start_date) myBadge = { cls: "restDay", label: "시작 전" };
-    else if (!workday) myBadge = { cls: "restDay", label: "휴무" };
+    else if (!workday) myBadge = { cls: "restDay", label: holidays.get(today) ?? "휴무" };
     else myBadge = { cls: "pending", label: "😴 인증 전" };
 
     groups.push({
@@ -71,7 +73,8 @@ export default async function Dashboard() {
     myOverrides.find((o) => o.member_id === memberId)?.scheduled_time ?? fallback;
   // 시작일이 안 된 그룹은 인증 카드 판정에서 제외 (카운트다운·미인증 압박 없음)
   const workdayMs = auth.memberships.filter(
-    ({ member, group }) => isWorkday(today, member.workdays) && today >= group.start_date
+    ({ member, group }) =>
+      isWorkday(today, member.workdays, holidays) && today >= group.start_date
   );
   const activeMs = workdayMs.filter(
     ({ member }) => !myAbsences.some((a) => a.member_id === member.id)
