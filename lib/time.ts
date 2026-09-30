@@ -50,7 +50,13 @@ export function isoWeekdayOf(dateStr: string): number {
   return wd === 0 ? 7 : wd;
 }
 
-export function isWorkday(dateStr: string, workdays: string): boolean {
+/** 근무 요일이면서 공휴일이 아닌 날. holidays는 날짜(YYYY-MM-DD)로 조회되는 Set/Map. */
+export function isWorkday(
+  dateStr: string,
+  workdays: string,
+  holidays?: { has(date: string): boolean }
+): boolean {
+  if (holidays?.has(dateStr)) return false;
   return workdays.includes(String(isoWeekdayOf(dateStr)));
 }
 

@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub, Holiday } from "../types";
 import type { DB, NewGroup, NewUser, NewMembership, NewCheckin, PinReset } from "./index";
 
 const BUCKET = "checkin-photos";
@@ -375,6 +375,34 @@ export function supabaseDb(): DB {
         throw new Error(error.message);
       }
       return true;
+    },
+
+    async listHolidays(from, to) {
+      const { data, error } = await sb
+        .from("holidays")
+        .select("date, name")
+        .gte("date", from)
+        .lte("date", to)
+        .order("date");
+      fail(error);
+      return (data as Holiday[]) ?? [];
+    },
+    async replaceHolidays(year, rows) {
+      // 넣고 나서 남는 날짜를 지운다 — 중간에 실패해도 공휴일이 비는 순간이 없도록
+      if (rows.length > 0) {
+        const { error } = await sb.from("holidays").upsert(rows, { onConflict: "date" });
+        fail(error);
+      }
+      let del = sb
+        .from("holidays")
+        .delete()
+        .gte("date", `${year}-01-01`)
+        .lte("date", `${year}-12-31`);
+      if (rows.length > 0) {
+        del = del.not("date", "in", `(${rows.map((r) => r.date).join(",")})`);
+      }
+      const { error: delErr } = await del;
+      fail(delErr);
     },
 
     async upsertPinReset(userId, codeHash, expiresAt) {

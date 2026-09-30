@@ -4,6 +4,7 @@ import { getAuthed } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kstParts, fmtWon, datesOfMonth, isoWeekdayOf } from "@/lib/time";
 import { groupMonthStats, competitionRanks, memberVisibleInMonth, STATUS_EMOJI } from "@/lib/stats";
+import { loadHolidays } from "@/lib/holidays";
 import { TopBar, TabBar } from "@/components/Nav";
 import KungyaFace from "@/components/KungyaFace";
 
@@ -39,13 +40,23 @@ export default async function Stats({
   const monthDates = datesOfMonth(month);
   const from = monthDates[0];
   const to = monthDates[monthDates.length - 1];
-  const [checkins, absences, fineHistory] = await Promise.all([
+  const [checkins, absences, fineHistory, holidays] = await Promise.all([
     d.listCheckins(ids, from, to),
     d.listAbsences(ids, from, to),
     d.listFineHistory(group.id),
+    loadHolidays(d, from, to),
   ]);
 
-  const stats = groupMonthStats(group, members, month, kst.date, checkins, absences, fineHistory);
+  const stats = groupMonthStats(
+    group,
+    members,
+    month,
+    kst.date,
+    checkins,
+    absences,
+    fineHistory,
+    holidays
+  );
   const myStats = stats.find((s) => s.member.id === member.id);
 
   // 랭킹: 벌금 많은 순 / 정시 출근 많은 순 — 동점자는 공동 순위 (RANK() 방식)
@@ -139,13 +150,15 @@ export default async function Stats({
                   ? "excused"
                   : ["onTime", "late", "absent", "pending"].includes(day.status)
                     ? day.status
-                    : "";
+                    : day.holiday
+                      ? "holiday" // 공휴일은 달력처럼 빨간 날짜로
+                      : "";
                 const dnum = parseInt(day.date.slice(8), 10);
                 return (
                   <div
                     key={day.date}
                     className={`cell ${cls}`}
-                    title={`${day.date} ${excusedLike ? `🏝 ${day.absence?.reason ?? ""}` : STATUS_EMOJI[day.status]}`}
+                    title={`${day.date} ${excusedLike ? `🏝 ${day.absence?.reason ?? ""}` : cls === "holiday" ? day.holiday : STATUS_EMOJI[day.status]}`}
                   >
                     {day.status === "onTime" ? (
                       <>

@@ -1,4 +1,4 @@
-import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub } from "../types";
+import type { Group, User, Member, Checkin, Absence, ScheduleOverride, FineRule, PushSub, Holiday } from "../types";
 
 // PIN 재설정 임시 코드 (그룹 관리자가 발급, 해시로 저장)
 export interface PinReset {
@@ -105,6 +105,12 @@ export interface DB {
   deleteOverride(memberId: string, workDate: string): Promise<void>;
   getOverride(memberId: string, workDate: string): Promise<ScheduleOverride | null>;
   listOverrides(memberIds: string[], from: string, to: string): Promise<ScheduleOverride[]>;
+
+  // 공휴일 (전 그룹 공통)
+  /** from~to(포함) 기간의 공휴일, 날짜 오름차순 */
+  listHolidays(from: string, to: string): Promise<Holiday[]>;
+  /** 해당 연도의 공휴일을 rows로 교체 — rows에 없는 그 해의 날짜는 삭제된다 */
+  replaceHolidays(year: number, rows: Holiday[]): Promise<void>;
 
   // 웹 푸시 구독 (기기당 1개, endpoint 기준 upsert)
   upsertPushSubscription(sub: PushSub): Promise<void>;

@@ -22,6 +22,7 @@ export interface DayRecord {
   status: DayStatus;
   checkin?: Checkin;
   absence?: Absence;
+  holiday?: string; // 공휴일 이름 (공휴일인 날만)
   fine: number;
 }
 
@@ -61,6 +62,7 @@ export function finesOn(
  * 한 멤버의 월간 기록 계산.
  * @param todayStr 오늘 날짜(KST, YYYY-MM-DD) — 이 날짜까지만 판정. 오늘 미인증은 pending.
  * @param fineHistory 벌금 변경 이력 — 날짜별로 그 시점의 금액을 적용 (없으면 현재 금액)
+ * @param holidays 공휴일(날짜 → 이름) — 근무 요일이어도 휴무로 판정
  */
 export function memberMonthStats(
   group: Group,
@@ -69,7 +71,8 @@ export function memberMonthStats(
   todayStr: string,
   checkins: Checkin[],
   absences: Absence[],
-  fineHistory: FineRule[] = []
+  fineHistory: FineRule[] = [],
+  holidays: ReadonlyMap<string, string> = new Map()
 ): MemberMonthStats {
   const byDateCheckin = new Map(checkins.map((c) => [c.work_date, c]));
   const byDateAbsence = new Map(absences.map((a) => [a.work_date, a]));
@@ -101,8 +104,8 @@ export function memberMonthStats(
       status = "restDay"; // 참여 전
     } else if (leftDate && date > leftDate && !checkin && !absence) {
       status = "restDay"; // 나간 뒤
-    } else if (!isWorkday(date, member.workdays)) {
-      status = "restDay";
+    } else if (!isWorkday(date, member.workdays, holidays)) {
+      status = "restDay"; // 근무 요일이 아니거나 공휴일
     } else {
       workdayCount++;
       if (absence) {
@@ -128,7 +131,7 @@ export function memberMonthStats(
       }
     }
     totalFine += fine;
-    days.push({ date, status, checkin, absence, fine });
+    days.push({ date, status, checkin, absence, holiday: holidays.get(date), fine });
   }
 
   return {
@@ -151,7 +154,8 @@ export function groupMonthStats(
   todayStr: string,
   checkins: Checkin[],
   absences: Absence[],
-  fineHistory: FineRule[] = []
+  fineHistory: FineRule[] = [],
+  holidays: ReadonlyMap<string, string> = new Map()
 ): MemberMonthStats[] {
   return members.map((m) =>
     memberMonthStats(
@@ -161,7 +165,8 @@ export function groupMonthStats(
       todayStr,
       checkins.filter((c) => c.member_id === m.id),
       absences.filter((a) => a.member_id === m.id),
-      fineHistory
+      fineHistory,
+      holidays
     )
   );
 }

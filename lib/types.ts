@@ -84,6 +84,12 @@ export interface Absence {
   created_at: string;
 }
 
+// 공휴일 — 공공데이터포털 특일정보에서 동기화. 전 그룹 공통으로 휴무 처리된다.
+export interface Holiday {
+  date: string; // "YYYY-MM-DD"
+  name: string; // 예: "한글날", "대체공휴일"
+}
+
 export interface ScheduleOverride {
   id: string;
   member_id: string;
